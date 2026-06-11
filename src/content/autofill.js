@@ -40,17 +40,20 @@
 		el.dispatchEvent(new MouseEvent('click', { ...o, buttons: 0 }));
 	}
 
+	// Detection keys off elements that only exist while the dropdown is open
+	// (the counter row / number input), NOT the container's bounding box —
+	// react-aria's dialog node is often 0x0 with absolutely-positioned content.
 	function findOpenPopup() {
+		const row = document.querySelector('.rec-guest-counter-row');
+		if (row) return row.closest('#guest-counter-popup, [role="dialog"], .sarsa-dropdown-base-popup') || row.parentElement;
+		const input = document.querySelector('input[name="numberField"]');
+		if (input) return input.closest('#guest-counter-popup, [role="dialog"], .sarsa-dropdown-base-popup') || input.parentElement;
 		const direct = document.querySelector(RG.SEL.guestPopup);
-		if (direct && direct.querySelector('.rec-guest-counter-row, button, input') && visible(direct)) return direct;
-		const dialogs = [...document.querySelectorAll('[aria-labelledby="guest-counter-title"], [role="dialog"]')]
-			.filter((d) => visible(d) && d.querySelector('.rec-guest-counter-row, [role="spinbutton"], input'));
-		dialogs.sort((a, b) => (a.getBoundingClientRect().width * a.getBoundingClientRect().height)
-			- (b.getBoundingClientRect().width * b.getBoundingClientRect().height));
-		return dialogs[0] || null;
+		if (direct && direct.querySelector('button, input')) return direct;
+		return null;
 	}
 
-	async function waitForPopup(timeout = 2500) {
+	async function waitForPopup(timeout = 3500) {
 		const t0 = Date.now();
 		while (Date.now() - t0 < timeout) {
 			const p = findOpenPopup();
@@ -113,15 +116,18 @@
 		if (!trigger) return { ok: false, reason: 'no-trigger' };
 		if (!popup) return { ok: false, reason: 'popup-not-found' };
 
+		// Drive the +/- buttons only. Each react-aria increment commits the value
+		// immediately, so no blur/Enter is needed (and blurring would move focus
+		// out of the FocusScope and close the popover before we finish).
 		const { inc, dec } = findStepperButtons(popup);
 		if (!inc && !dec) {
 			commit(trigger, popup);
 			return { ok: false, reason: 'no-stepper', hint: 'run RG.autofill.dumpPopup()' };
 		}
 
-		// Drive the steppers, reading the real value each iteration so any
-		// double-fire self-corrects (overshoot -> click the other direction).
+		// Read the real value each iteration so any double-fire self-corrects.
 		let steps = 0;
+		let stalls = 0;
 		let lastSeen = readFromPopup(popup) ?? readCurrentFromTrigger() ?? 0;
 		while (steps++ < maxSteps) {
 			const read = readFromPopup(popup) ?? readCurrentFromTrigger();
@@ -131,22 +137,33 @@
 			const btn = goUp ? inc : dec;
 			if (!btn || btn.disabled) break;
 			press(btn);
-			lastSeen = cur + (goUp ? 1 : -1);
-			await RG.sleep(80);
+			await RG.sleep(90);
+			const after = readFromPopup(popup) ?? readCurrentFromTrigger();
+			if (after != null && after === cur) {
+				if (++stalls >= 3) {
+					commit(trigger, popup);
+					return { ok: false, reason: 'stepper-no-progress', value: cur, hint: 'run RG.autofill.dumpPopup()' };
+				}
+			} else {
+				stalls = 0;
+			}
+			lastSeen = after == null ? cur + (goUp ? 1 : -1) : after;
 		}
 
 		const reached = readFromPopup(popup);
 		commit(trigger, popup);
-		await RG.sleep(180);
+		await RG.sleep(200);
 		const final = readCurrentFromTrigger() ?? reached ?? lastSeen;
 		return { ok: final === target, value: final, via: 'stepper' };
 	}
 
 	// Close the dropdown so the SPA commits the selection and fetches availability.
+	// Each increment already commits the number; closing finalizes the overlay.
 	function commit(trigger, popup) {
-		const apply = popup && [...popup.querySelectorAll('button')]
-			.find((b) => /done|apply|update|save|confirm|search|show results/i.test(b.textContent || ''));
-		if (apply) press(apply);
+		const actions = popup && (popup.closest('[data-component="DropdownBase-popup"]') || popup);
+		const close = actions && [...actions.querySelectorAll('button')]
+			.find((b) => /^(close|done|apply|update|save|confirm)$/i.test((b.textContent || '').trim()));
+		if (close) { press(close); return; }
 		document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 		if (trigger && trigger.getAttribute('aria-expanded') === 'true') press(trigger);
 	}
