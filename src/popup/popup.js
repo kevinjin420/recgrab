@@ -36,11 +36,14 @@ async function loadConfig(key) {
 let saveTimer;
 function persist() {
 	clearTimeout(saveTimer);
-	saveTimer = setTimeout(async () => {
-		const all = await getConfigs();
-		all[state.key] = { ...normalizeConfig(state.cfg), updatedAt: Date.now() };
-		await chrome.storage.sync.set({ configs: all });
-	}, 200);
+	saveTimer = setTimeout(persistNow, 200);
+}
+async function persistNow() {
+	clearTimeout(saveTimer);
+	if (!state.key) return;
+	const all = await getConfigs();
+	all[state.key] = { ...normalizeConfig(state.cfg), updatedAt: Date.now() };
+	await chrome.storage.sync.set({ configs: all });
 }
 
 // ---- global flags (universal: master on/off + armed) ----
@@ -200,26 +203,36 @@ function toggleWatch(id, on) {
 function renderDates() {
 	const wrap = $('dateList');
 	wrap.innerHTML = '';
-	if (!state.scan.dates.length) {
-		wrap.innerHTML = '<span class="date-list-empty">No date columns detected.</span>';
+	const targets = [...new Set(state.cfg.targetDates || [])].sort();
+	if (!targets.length) {
+		wrap.innerHTML = '<span class="date-list-empty">No target dates yet.</span>';
 		return;
 	}
-	state.scan.dates.forEach((d) => {
-		const on = state.cfg.targetDates.includes(d.iso);
-		const chip = document.createElement('label');
-		chip.className = 'date-chip' + (on ? ' checked' : '');
-		chip.innerHTML = `<input type="checkbox" ${on ? 'checked' : ''} />
-			<span class="dow">${d.weekday}</span><span class="dnum">${d.day}</span>`;
-		chip.title = d.label;
-		chip.querySelector('input').addEventListener('change', (e) => {
-			const set = new Set(state.cfg.targetDates);
-			e.target.checked ? set.add(d.iso) : set.delete(d.iso);
-			state.cfg.targetDates = [...set];
-			chip.classList.toggle('checked', e.target.checked);
+	targets.forEach((iso) => {
+		const d = targetDateParts(iso);
+		const chip = document.createElement('button');
+		chip.type = 'button';
+		chip.className = 'date-chip target-date-chip checked';
+		chip.title = `Remove ${d.label}`;
+		chip.innerHTML = `<span class="dow"></span><span class="dnum"></span><span class="remove">×</span>`;
+		chip.querySelector('.dow').textContent = d.weekday;
+		chip.querySelector('.dnum').textContent = d.short;
+		chip.addEventListener('click', () => {
+			state.cfg.targetDates = (state.cfg.targetDates || []).filter((x) => x !== iso);
 			persist();
+			renderDates();
 		});
 		wrap.appendChild(chip);
 	});
+}
+
+function targetDateParts(iso) {
+	const d = new Date(iso + 'T00:00:00');
+	return {
+		weekday: d.toLocaleDateString(undefined, { weekday: 'short' }),
+		short: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+		label: d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+	};
 }
 
 // ---- control wiring ----
@@ -237,13 +250,17 @@ function wire() {
 	$('selAll').addEventListener('click', () => bulkSelect('all'));
 	$('selNone').addEventListener('click', () => bulkSelect('none'));
 	$('selOpen').addEventListener('click', () => bulkSelect('open'));
+	$('addDateBtn').addEventListener('click', addTargetDateFromInput);
+	$('targetDateInput').addEventListener('keydown', (e) => {
+		if (e.key === 'Enter') addTargetDateFromInput();
+	});
 
 	$('bPlus').addEventListener('click', () => bumpBanner(1));
 	$('bMinus').addEventListener('click', () => bumpBanner(-1));
 	$('loadBtn').addEventListener('click', loadAvailability);
 	$('dumpLink').addEventListener('click', copyDiagnostics);
 	$('retryBtn').addEventListener('click', init);
-	$('saveBtn').addEventListener('click', () => window.close());
+	$('saveBtn').addEventListener('click', async () => { await persistNow(); window.close(); });
 	$('clearBtn').addEventListener('click', clearConfig);
 }
 
@@ -266,6 +283,21 @@ function bulkSelect(mode) {
 	else if (mode === 'open') state.cfg.watchlist = state.scan.entryPoints.filter((e) => qualifiedOpen(e).count).map((e) => e.id);
 	persist();
 	renderEntryPoints($('epSearch').value);
+}
+
+function addTargetDate(iso) {
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return false;
+	const set = new Set(state.cfg.targetDates || []);
+	set.add(iso);
+	state.cfg.targetDates = [...set].sort();
+	persist();
+	renderDates();
+	return true;
+}
+
+function addTargetDateFromInput() {
+	const input = $('targetDateInput');
+	if (addTargetDate(input.value)) input.value = '';
 }
 
 // Opens the live guest popup, grabs its markup, and copies it to the clipboard

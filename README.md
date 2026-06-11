@@ -139,7 +139,7 @@ to ISO dates by parsing the header row's screen-reader date labels
 | Hide unselected rows | Collapse rows not in your selection |
 | Hide selected rows with nothing open | Hide watched rows with no open date in view |
 | Dim unavailable / not-released | De-emphasize cells you can't book |
-| Target dates | Date chips scanned from the page; the dates auto-grab may click |
+| Target dates | Arbitrary dates you add; RecGrab navigates the availability page to those date windows before scanning/clicking |
 | On (global) | Master on/off for the whole extension; toggling off disarms |
 | Armed (global) | Auto-grab is live on every saved page; clicks the date cell then **Book Now**, stays armed until turned off |
 

@@ -56,6 +56,49 @@
 		try { btn.click(); } catch {}
 	}
 
+	function visibleDates() {
+		const scan = RG.scanGrid();
+		return scan ? scan.colDates.filter(Boolean) : [];
+	}
+
+	function currentGridDateRange() {
+		const dates = visibleDates();
+		return { dates, start: dates[0] || null, end: dates[dates.length - 1] || null };
+	}
+
+	function isDateVisible(iso) {
+		return visibleDates().includes(iso);
+	}
+
+	function currentPageDate() {
+		const hidden = document.querySelector(RG.SEL.entryDateHidden)?.value;
+		if (hidden) return hidden;
+		return new URL(location.href).searchParams.get('date');
+	}
+
+	function navigateToDate(iso) {
+		if (isDateVisible(iso)) return false;
+		if (currentPageDate() === iso) {
+			RG.log('date navigation pending; already on page date', iso);
+			return false;
+		}
+		const url = new URL(location.href);
+		url.searchParams.set('date', iso);
+		if (url.toString() === location.href) return false;
+		RG.log('navigating availability date', currentPageDate(), '->', iso);
+		location.assign(url.toString());
+		return true;
+	}
+
+	async function waitForDateVisible(iso, timeout = 9000) {
+		const t0 = Date.now();
+		while (Date.now() - t0 < timeout) {
+			if (isDateVisible(iso)) return true;
+			await RG.sleep(150);
+		}
+		return false;
+	}
+
 	// Wait until "Book Now" exists AND is enabled (i.e. a date selection has
 	// actually registered). Returns the button or null on timeout.
 	async function waitForEnabledBookNow(timeout = 4000) {
@@ -111,11 +154,70 @@
 		return false;
 	}
 
-	// Find the best matching open cell across watched rows + target dates.
-	function findGrabTarget(config) {
+	function targetDates(config) {
+		return [...new Set(config.targetDates || [])].filter(Boolean).sort();
+	}
+
+	const NAV_KEY = () => `rg-nav:${RG.contextKey() || location.pathname}`;
+	const NAV_COOLDOWN_MS = 45000;
+
+	function readNavState() {
+		try {
+			return JSON.parse(sessionStorage.getItem(NAV_KEY()) || '{}');
+		} catch {
+			return {};
+		}
+	}
+
+	function writeNavState(state) {
+		try { sessionStorage.setItem(NAV_KEY(), JSON.stringify(state)); } catch {}
+	}
+
+	const targetSignature = (targets) => targets.join('|');
+
+	function navStateFor(targets) {
+		const sig = targetSignature(targets);
+		const state = readNavState();
+		if (state.sig !== sig) return { sig, checked: [], cooldownUntil: 0 };
+		return state;
+	}
+
+	function markChecked(dates, targets) {
+		const state = navStateFor(targets);
+		const checked = new Set(state.checked || []);
+		dates.forEach((d) => checked.add(d));
+		writeNavState({ ...state, checked: [...checked] });
+	}
+
+	function clearChecked() {
+		writeNavState({ checked: [], cooldownUntil: 0 });
+	}
+
+	function nextNavigationDate(targets) {
+		const state = navStateFor(targets);
+		if (state.cooldownUntil && Date.now() < state.cooldownUntil) {
+			RG.log('date navigation cooldown active');
+			return null;
+		}
+		const checked = new Set(state.checked || []);
+		const unchecked = targets.filter((d) => !checked.has(d));
+		if (!unchecked.length) {
+			RG.log('checked all target date windows; cooling down');
+			writeNavState({ ...state, checked: [], cooldownUntil: Date.now() + NAV_COOLDOWN_MS });
+			return null;
+		}
+		const range = currentGridDateRange();
+		if (!range.start || !range.end) return unchecked[0] || null;
+		return unchecked.find((d) => d > range.end)
+			|| unchecked.find((d) => d < range.start)
+			|| unchecked[0] || null;
+	}
+
+	// Find the best matching open cell across watched rows for one visible target date.
+	function findGrabTarget(config, targetIso = null) {
 		const scan = RG.scanGrid();
 		if (!scan) return null;
-		const targets = (config.targetDates || []).filter(Boolean);
+		const targets = targetIso ? [targetIso] : targetDates(config).filter((d) => scan.colDates.includes(d));
 
 		for (const row of scan.rows) {
 			if (!RG.matchesWatchlist(row, config.watchlist)) continue;
@@ -131,7 +233,7 @@
 
 	let booking = false; // re-entrancy guard while a grab is in flight
 
-	const hasTargets = (c) => !!((c.watchlist && c.watchlist.length) ||
+	const hasTargets = (c) => !!((c.watchlist && c.watchlist.length) &&
 		(c.targetDates && c.targetDates.length));
 
 	// NOTE: arming is governed globally (main.js starts/stops us on the global
@@ -145,7 +247,36 @@
 			await RG.autofill.setGroupSize(config.groupSize);
 		}
 
-		const target = findGrabTarget(config);
+		const targets = targetDates(config);
+		const visibleTargets = targets.filter(isDateVisible);
+		if (!visibleTargets.length) {
+			const next = nextNavigationDate(targets);
+			if (next) {
+				if (currentPageDate() === next) {
+					const visible = await waitForDateVisible(next, 2500);
+					if (visible) return tick(config);
+					RG.log('target page date did not become visible; trying next target', next);
+					markChecked([next], targets);
+					const alt = nextNavigationDate(targets);
+					if (alt && alt !== next) navigateToDate(alt);
+				} else {
+					navigateToDate(next);
+				}
+			}
+			return;
+		}
+
+		let target = null;
+		for (const iso of visibleTargets) {
+			target = findGrabTarget(config, iso);
+			if (target) break;
+		}
+		if (!target) {
+			markChecked(visibleTargets, targets);
+			const next = nextNavigationDate(targets);
+			if (next) navigateToDate(next);
+			return;
+		}
 		if (!target) return;
 		if (target.key === lastClickKey) return; // don't spam the same cell
 
@@ -157,7 +288,7 @@
 		// Whole sequence retries: re-resolve fresh elements each attempt so a grid
 		// re-render between selecting and booking can't strand us on a stale node.
 		for (let attempt = 1; attempt <= 3 && !booked; attempt++) {
-			const fresh = findGrabTarget(config) || target;
+			const fresh = findGrabTarget(config, target.date.iso) || target;
 			const selected = await selectDateCell(fresh.date.btnEl);
 			if (!selected) {
 				RG.log(`grab attempt ${attempt}: selection never registered`);
@@ -170,6 +301,7 @@
 
 		// Stay armed: auto-grab keeps watching until the user turns it off.
 		// On failure, clear the guard so the next tick retries this same cell.
+		if (booked) clearChecked();
 		if (!booked) lastClickKey = null;
 		booking = false;
 		notify(booked
@@ -192,7 +324,7 @@
 		// Kick a few quick ticks while the grid settles, then fall back to interval.
 		for (let i = 0; i < 6; i++) {
 			if (!timer) return; // stopped/booked
-			await tick(config);
+			await tick(await RG.getConfig());
 			if (booking || !timer) return;
 			await RG.sleep(700);
 		}
@@ -205,6 +337,8 @@
 	window.RG.autograb = {
 		start, stop, tick, findGrabTarget, findBookNow, findAllBookNow,
 		clickBookNow, selectDateCell, waitForEnabledBookNow, pressBtn,
+		visibleDates, currentGridDateRange, isDateVisible, currentPageDate,
+		navigateToDate, waitForDateVisible,
 		resetClickGuard: () => (lastClickKey = null)
 	};
 })();

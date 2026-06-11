@@ -79,7 +79,11 @@
 
 		<section class="block block-grab">
 			<div class="block-head"><h2>Auto-grab dates</h2></div>
-			<p class="muted">Pick the dates RecGrab may click for your selected entry points. Flip <strong>Armed</strong> in the header to go live (global — works on every saved page).</p>
+			<p class="muted">Add the exact dates RecGrab may click for your selected entry points. Flip <strong>Armed</strong> in the header to go live (global — works on every saved page).</p>
+			<div class="date-add-row">
+				<input type="date" id="targetDateInput" class="date-input" />
+				<button id="addDateBtn" class="btn btn-secondary" type="button">Add date</button>
+			</div>
 			<div id="dateList" class="date-list" role="group" aria-label="Target dates"></div>
 			<p class="warn">When armed, RecGrab selects a matching date and clicks <strong>Book Now</strong> to lock the slot, and <strong>stays armed</strong> until you turn it off here or from any page. It never completes checkout, payment, or captcha. Use within Recreation.gov's Terms of Service.</p>
 		</section>

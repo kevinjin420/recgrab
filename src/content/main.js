@@ -14,7 +14,7 @@
 	function eff() { return { ...config, enabled: globals.enabled }; }
 	function panelState() { return { enabled: globals.enabled, armed: globals.armed }; }
 	function hasTargets() {
-		return !!((config.watchlist && config.watchlist.length) ||
+		return !!((config.watchlist && config.watchlist.length) &&
 			(config.targetDates && config.targetDates.length));
 	}
 

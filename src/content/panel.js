@@ -91,8 +91,11 @@
 	async function diagTarget() {
 		const cfg = await RG.getConfig();
 		const g = await RG.getGlobals();
+		const range = RG.autograb.currentGridDateRange();
 		logLine(`globals: on=${g.enabled} armed=${g.armed}`);
 		logLine(`config: group=${cfg.groupSize} watch=[${(cfg.watchlist || []).join(',')}] dates=[${(cfg.targetDates || []).join(',')}]`);
+		logLine(`visible dates: ${range.start || '?'} → ${range.end || '?'} (${range.dates.length} columns)`);
+		logLine(`page date: ${RG.autograb.currentPageDate() || '(none)'}`);
 		const t = RG.autograb.findGrabTarget(cfg);
 		if (!t) { logLine('grab target: none (no matching open cell for current filters)'); return; }
 		logLine(`grab target: ${t.row.name} · ${t.date.iso} · ${t.date.remaining} spots · btnDisabled=${!!t.date.btnEl.disabled}`);
