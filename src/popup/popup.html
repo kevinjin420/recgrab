@@ -59,12 +59,34 @@
 		</section>
 
 		<section class="block">
-			<div class="block-head block-head-inline">
-				<h2>Group size</h2>
-				<div class="stepper" role="group" aria-label="Group size">
-					<button id="gsMinus" type="button" aria-label="Decrease">−</button>
-					<input type="number" id="groupSize" min="1" inputmode="numeric" />
-					<button id="gsPlus" type="button" aria-label="Increase">+</button>
+			<div class="booking-controls">
+				<div class="booking-field">
+					<span class="field-label">Group size</span>
+					<div class="stepper" role="group" aria-label="Group size">
+						<button id="gsMinus" type="button" aria-label="Decrease">−</button>
+						<input type="number" id="groupSize" min="1" inputmode="numeric" />
+						<button id="gsPlus" type="button" aria-label="Increase">+</button>
+					</div>
+				</div>
+				<div class="booking-field booking-field-date">
+					<span class="field-label">Target date</span>
+					<div class="calendar-wrap" id="calendarWrap">
+						<button id="dateTrigger" class="date-trigger" type="button" aria-expanded="false" aria-controls="calendarPanel">
+							<span id="dateTriggerText">Pick a date</span>
+							<span class="date-trigger-icon">▾</span>
+						</button>
+						<div id="calendarPanel" class="calendar-panel" hidden>
+							<div class="calendar-head">
+								<button id="calPrev" class="calendar-nav" type="button" aria-label="Previous month">‹</button>
+								<strong id="calTitle"></strong>
+								<button id="calNext" class="calendar-nav" type="button" aria-label="Next month">›</button>
+							</div>
+							<div class="calendar-weekdays" aria-hidden="true">
+								<span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+							</div>
+							<div id="calGrid" class="calendar-grid" role="grid" aria-label="Choose target date"></div>
+						</div>
+					</div>
 				</div>
 			</div>
 		</section>
@@ -77,30 +99,6 @@
 			<label class="switch sm"><input type="checkbox" id="dimUnavailable" /><span>Dim unavailable / not-released</span></label>
 		</section>
 
-		<section class="block block-grab">
-			<div class="block-head"><h2>Auto-grab date</h2></div>
-			<p class="muted">Pick the exact date RecGrab should watch for your selected entry points. Flip <strong>Armed</strong> in the header to go live (global — works on every saved page).</p>
-			<div class="date-add-row">
-				<div class="calendar-wrap" id="calendarWrap">
-					<button id="dateTrigger" class="date-trigger" type="button" aria-expanded="false" aria-controls="calendarPanel">
-						<span id="dateTriggerText">Pick a date</span>
-						<span class="date-trigger-icon">▾</span>
-					</button>
-					<div id="calendarPanel" class="calendar-panel" hidden>
-						<div class="calendar-head">
-							<button id="calPrev" class="calendar-nav" type="button" aria-label="Previous month">‹</button>
-							<strong id="calTitle"></strong>
-							<button id="calNext" class="calendar-nav" type="button" aria-label="Next month">›</button>
-						</div>
-						<div class="calendar-weekdays" aria-hidden="true">
-							<span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
-						</div>
-						<div id="calGrid" class="calendar-grid" role="grid" aria-label="Choose target date"></div>
-					</div>
-				</div>
-			</div>
-			<p class="warn">When armed, RecGrab selects a matching date and clicks <strong>Book Now</strong> to lock the slot, and <strong>stays armed</strong> until you turn it off here or from any page. It never completes checkout, payment, or captcha. Use within Recreation.gov's Terms of Service.</p>
-		</section>
 	</main>
 
 	<footer id="footer" class="footer" hidden>
