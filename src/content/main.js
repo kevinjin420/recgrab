@@ -26,8 +26,9 @@
 	}
 
 	// Popup <-> content messaging. Registered unconditionally so the popup can
-	// talk to any recreation.gov tab, even non-availability pages.
-	chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+	// talk to any recreation.gov tab, even non-availability pages. Wrapped because
+	// an orphaned script (after an extension reload) can't register listeners.
+	try { chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 		if (!msg || !msg.type) return;
 		switch (msg.type) {
 			case 'rg:scan':
@@ -46,7 +47,7 @@
 				sendResponse({ ok: true, context: RG.contextKey(), ready: !!RG.scanGrid() });
 				return;
 		}
-	});
+	}); } catch {}
 
 	async function boot() {
 		config = await RG.getConfig();
@@ -82,9 +83,11 @@
 		});
 	}
 
-	// Re-apply on SPA navigations (recreation.gov is a single-page app).
+	// Re-apply on SPA navigations (recreation.gov is a single-page app). Self-
+	// destructs if this script gets orphaned by an extension reload.
 	let lastPath = location.pathname;
-	setInterval(() => {
+	const navTimer = setInterval(() => {
+		if (!RG.extAlive()) { clearInterval(navTimer); RG.autograb.stop(); return; }
 		if (location.pathname !== lastPath) {
 			lastPath = location.pathname;
 			RG.log('SPA navigation ->', lastPath);

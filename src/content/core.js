@@ -36,7 +36,8 @@
 		entryNameBtn: 'p.sarsa-text button.sarsa-button-link',
 		guestTrigger: '#guest-counter',
 		guestPopup: '#guest-counter-popup',
-		entryDateHidden: '#single-date-hidden'
+		entryDateHidden: '#single-date-hidden',
+		bookNow: '.per-availability-book-now button.sarsa-button-primary'
 	};
 
 	function pageContext() {
@@ -149,9 +150,23 @@
 	const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 	// ---- Config storage (per-context) ----
+	// During dev, reloading the extension orphans this content script: its
+	// chrome.* handle is severed and calls throw "Extension context invalidated".
+	// Guard every access so a stale script degrades gracefully instead of
+	// spewing uncaught rejections (reloading the page re-injects a fresh script).
+	function extAlive() {
+		try { return !!(chrome.runtime && chrome.runtime.id); } catch { return false; }
+	}
+
 	async function getAllConfigs() {
-		const stored = await chrome.storage.sync.get('configs');
-		return stored.configs || {};
+		if (!extAlive()) return {};
+		try {
+			const stored = await chrome.storage.sync.get('configs');
+			return stored.configs || {};
+		} catch (e) {
+			if (/context invalidated/i.test(e?.message || '')) return {};
+			throw e;
+		}
 	}
 
 	async function getConfig(key = contextKey()) {
@@ -160,32 +175,46 @@
 	}
 
 	async function setConfig(patch, key = contextKey()) {
-		if (!key) return null;
+		if (!key || !extAlive()) return null;
 		const all = await getAllConfigs();
 		const next = { ...DEFAULT_CONFIG, ...(all[key] || {}), ...patch, updatedAt: Date.now() };
 		all[key] = next;
-		await chrome.storage.sync.set({ configs: all });
+		try { await chrome.storage.sync.set({ configs: all }); }
+		catch (e) { if (!/context invalidated/i.test(e?.message || '')) throw e; }
 		return next;
 	}
 
 	async function deleteConfig(key = contextKey()) {
-		if (!key) return;
+		if (!key || !extAlive()) return;
 		const all = await getAllConfigs();
 		delete all[key];
-		await chrome.storage.sync.set({ configs: all });
+		try { await chrome.storage.sync.set({ configs: all }); }
+		catch (e) { if (!/context invalidated/i.test(e?.message || '')) throw e; }
 	}
 
 	// Fire cb with the merged config for the CURRENT context whenever configs change.
 	function onConfigChange(cb) {
-		chrome.storage.onChanged.addListener((changes, area) => {
-			if (area !== 'sync' || !changes.configs) return;
-			const key = contextKey();
-			const all = changes.configs.newValue || {};
-			cb({ ...DEFAULT_CONFIG, ...(key ? all[key] : null) });
-		});
+		if (!extAlive()) return;
+		try {
+			chrome.storage.onChanged.addListener((changes, area) => {
+				if (area !== 'sync' || !changes.configs) return;
+				const key = contextKey();
+				const all = changes.configs.newValue || {};
+				cb({ ...DEFAULT_CONFIG, ...(key ? all[key] : null) });
+			});
+		} catch {}
 	}
 
-	const log = (...args) => console.debug('%c[RecGrab]', 'color:#466c04;font-weight:bold', ...args);
+	const log = (...args) => {
+		console.debug('%c[RecGrab]', 'color:#466c04;font-weight:bold', ...args);
+		// Mirror to the on-page diagnostics panel (best-effort).
+		try {
+			const line = args.map((a) =>
+				typeof a === 'string' ? a : (() => { try { return JSON.stringify(a); } catch { return String(a); } })()
+			).join(' ');
+			window.dispatchEvent(new CustomEvent('rg:log', { detail: line }));
+		} catch {}
+	};
 
 	// Current group-members count from the trigger label, or null if unset.
 	function readGroupSize() {
@@ -287,7 +316,7 @@
 		buildColumnDateMap, readRow, matchesWatchlist, setReactInputValue,
 		waitFor, sleep, log, isoFromDate, readGroupSize, isGuestPlaceholder,
 		getAllConfigs, getConfig, setConfig, deleteConfig, onConfigChange,
-		scanGrid, scanOptions, pageLabel
+		scanGrid, scanOptions, pageLabel, extAlive
 	};
 
 	log('core loaded', contextKey());

@@ -34,7 +34,22 @@
 			el('p', { class: 'rg-hint' }, 'Configure entry points & group size from the toolbar popup.')
 		);
 
-		root.append(head, status, body);
+		// --- Temporary diagnostics (debug "Book Now" not clicking) ---
+		const logBox = el('pre', { class: 'rg-log', id: 'rg-log' }, '');
+		const diag = el('div', { class: 'rg-diag', id: 'rg-diag' },
+			el('div', { class: 'rg-diag-head' },
+				el('strong', {}, 'Diagnostics'),
+				el('button', { class: 'rg-min', title: 'Clear', onclick: () => { logBox.textContent = ''; } }, 'clear')
+			),
+			el('div', { class: 'rg-diag-btns' },
+				el('button', { class: 'rg-btn', onclick: diagInspect }, 'Inspect'),
+				el('button', { class: 'rg-btn', onclick: diagTarget }, 'Find target'),
+				el('button', { class: 'rg-btn', onclick: diagBookNow }, 'Click Book Now')
+			),
+			logBox
+		);
+
+		root.append(head, status, body, diag);
 		document.body.appendChild(root);
 
 		window.addEventListener('rg:status', (e) => setStatus(e.detail));
@@ -42,6 +57,49 @@
 			const { matched, totalRows } = e.detail;
 			setStatus(`${matched} open match${matched === 1 ? '' : 'es'} · ${totalRows} rows`);
 		});
+		window.addEventListener('rg:log', (e) => logLine(e.detail));
+	}
+
+	function logLine(text) {
+		const box = document.getElementById('rg-log');
+		if (!box) return;
+		const ts = new Date().toLocaleTimeString();
+		box.textContent += `[${ts}] ${text}\n`;
+		box.scrollTop = box.scrollHeight;
+	}
+
+	// Report every "Book Now" candidate auto-grab can see right now.
+	function diagInspect() {
+		const all = RG.autograb.findAllBookNow();
+		logLine(`Book Now candidates: ${all.length}`);
+		all.forEach((btn, i) => {
+			const r = btn.getBoundingClientRect();
+			const s = getComputedStyle(btn);
+			const disabledClass = /sarsa-button-disabled/.test(btn.className || '');
+			const vis = r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
+			logLine(`  #${i}: vis=${vis} disabledProp=${!!btn.disabled} ariaDis=${btn.getAttribute('aria-disabled')} disClass=${disabledClass}`);
+			logLine(`       rect top=${Math.round(r.top)} left=${Math.round(r.left)} ${Math.round(r.width)}x${Math.round(r.height)} (vh=${window.innerHeight}) class="${(btn.className || '').slice(0, 60)}"`);
+		});
+		const chosen = RG.autograb.findBookNow();
+		logLine(`  -> chosen index: ${all.indexOf(chosen)}`);
+		const sel = document.querySelector('.selection-information');
+		logLine(`  selection-information: ${sel ? '"' + (sel.textContent || '').replace(/\s+/g, ' ').trim() + '"' : '(none)'}`);
+	}
+
+	// Report the best grab target for the current saved config.
+	async function diagTarget() {
+		const cfg = await RG.getConfig();
+		logLine(`config: enabled=${cfg.enabled} autoGrab=${cfg.autoGrab} group=${cfg.groupSize} watch=[${(cfg.watchlist || []).join(',')}] dates=[${(cfg.targetDates || []).join(',')}]`);
+		const t = RG.autograb.findGrabTarget(cfg);
+		if (!t) { logLine('grab target: none (no matching open cell for current filters)'); return; }
+		logLine(`grab target: ${t.row.name} · ${t.date.iso} · ${t.date.remaining} spots · btnDisabled=${!!t.date.btnEl.disabled}`);
+	}
+
+	// Manually drive the Book Now click path and report the outcome.
+	async function diagBookNow() {
+		logLine('manual: clicking Book Now…');
+		const ok = await RG.autograb.clickBookNow({ timeout: 4000 });
+		logLine('manual: clickBookNow -> ' + (ok ? 'CLICKED' : 'failed (see above)'));
 	}
 
 	function quickToggle(label, key, config, danger) {

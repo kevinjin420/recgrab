@@ -75,3 +75,34 @@
 .rg-toggle.rg-danger span { color: #b84a4a; font-weight: 600; }
 .rg-toggle.rg-danger input { accent-color: #b84a4a; }
 .rg-hint { margin: 2px 0 0; font-size: 11px; color: #6a7381; line-height: 1.35; }
+
+/* Temporary diagnostics */
+.rg-diag {
+	border-top: 1px solid #dee0e3;
+	padding: 8px 10px 10px;
+	background: #fafbfc;
+}
+.rg-collapsed .rg-diag { display: none; }
+.rg-diag-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.rg-diag-head strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #6a7381; }
+.rg-diag-head .rg-min { color: #345d96; font-size: 11px; text-transform: uppercase; }
+.rg-diag-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.rg-btn {
+	flex: 1 1 auto;
+	background: #345d96; color: #fff; border: 0; border-radius: 5px;
+	padding: 5px 8px; font-size: 11px; font-weight: 600; cursor: pointer;
+	white-space: nowrap;
+}
+.rg-btn:hover { background: #2a4c7d; }
+.rg-log {
+	margin: 0;
+	max-height: 160px;
+	overflow: auto;
+	background: #1a1e23;
+	color: #d8e6c4;
+	border-radius: 5px;
+	padding: 6px 8px;
+	font: 10px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
