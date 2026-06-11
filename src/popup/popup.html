@@ -24,6 +24,20 @@
 
 	<!-- Configurator (hidden until a scan succeeds) -->
 	<main id="config" hidden>
+		<section id="unsetBanner" class="block banner" hidden>
+			<p class="banner-title">Set a group size to load availability</p>
+			<p class="banner-sub">Recreation.gov hides all entry points until a group size is chosen.</p>
+			<div class="row-inline">
+				<div class="stepper" role="group" aria-label="Group size">
+					<button id="bMinus" type="button" aria-label="Decrease">−</button>
+					<input type="number" id="bGroupSize" min="1" inputmode="numeric" />
+					<button id="bPlus" type="button" aria-label="Increase">+</button>
+				</div>
+				<button id="loadBtn" class="btn btn-secondary">Set &amp; load</button>
+			</div>
+			<button id="dumpLink" class="link" type="button">Group size won't set? Copy diagnostics</button>
+		</section>
+
 		<section class="block">
 			<div class="row-between">
 				<label class="switch">

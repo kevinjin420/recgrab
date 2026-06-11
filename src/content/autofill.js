@@ -1,85 +1,165 @@
-// Auto-set the "Group Members" / number-of-people counter.
+// Auto-set the "Group Members" counter.
 //
-// The popup renders on demand and its internal markup isn't in the static
-// capture, so this converges robustly: read current value, find the stepper
-// input or +/- buttons, and drive them toward the target.
+// Confirmed popup structure (from capture-members), rendered inside
+// #guest-counter-popup when open:
+//   .rec-guest-counter-row
+//     button[aria-label="Remove Peoples"]   (decrement; disabled at min)
+//     input[name="numberField"]             (text input, pattern \d*, value "0")
+//     button[aria-label="Add Peoples"]      (increment)
+// It's a react-aria NumberField, so we drive the +/- buttons and read the input
+// value each step, self-correcting any over/undershoot. Availability is hidden
+// until this is set, so this is what unlocks the grid from the placeholder state.
 (() => {
 	const RG = window.RG;
 
-	// The trigger label reads like "3 Group Members" / "2 Guests".
 	function readCurrentFromTrigger() {
-		const t = document.querySelector(RG.SEL.guestTrigger);
-		if (!t) return null;
-		const m = (t.textContent || '').match(/(\d+)/);
-		return m ? parseInt(m[1], 10) : null;
+		return RG.readGroupSize();
+	}
+
+	const visible = (el) => {
+		if (!el) return false;
+		const r = el.getBoundingClientRect();
+		return r.width > 0 && r.height > 0;
+	};
+
+	// One clean activation with correct coordinates. react-aria's usePress checks
+	// the pointer is still over the target on pointerup (via clientX/Y), so we
+	// must supply the element center or it cancels the press.
+	function press(el) {
+		if (!el) return;
+		const r = el.getBoundingClientRect();
+		const o = {
+			bubbles: true, cancelable: true, composed: true, view: window,
+			clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+			button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', isPrimary: true
+		};
+		try { el.dispatchEvent(new PointerEvent('pointerdown', o)); } catch { el.dispatchEvent(new MouseEvent('mousedown', o)); }
+		el.dispatchEvent(new MouseEvent('mousedown', { ...o }));
+		try { el.dispatchEvent(new PointerEvent('pointerup', { ...o, buttons: 0 })); } catch { el.dispatchEvent(new MouseEvent('mouseup', o)); }
+		el.dispatchEvent(new MouseEvent('mouseup', { ...o, buttons: 0 }));
+		el.dispatchEvent(new MouseEvent('click', { ...o, buttons: 0 }));
+	}
+
+	function findOpenPopup() {
+		const direct = document.querySelector(RG.SEL.guestPopup);
+		if (direct && direct.querySelector('.rec-guest-counter-row, button, input') && visible(direct)) return direct;
+		const dialogs = [...document.querySelectorAll('[aria-labelledby="guest-counter-title"], [role="dialog"]')]
+			.filter((d) => visible(d) && d.querySelector('.rec-guest-counter-row, [role="spinbutton"], input'));
+		dialogs.sort((a, b) => (a.getBoundingClientRect().width * a.getBoundingClientRect().height)
+			- (b.getBoundingClientRect().width * b.getBoundingClientRect().height));
+		return dialogs[0] || null;
+	}
+
+	async function waitForPopup(timeout = 2500) {
+		const t0 = Date.now();
+		while (Date.now() - t0 < timeout) {
+			const p = findOpenPopup();
+			if (p) return p;
+			await RG.sleep(100);
+		}
+		return null;
+	}
+
+	// Open the dropdown, verifying via aria-expanded / popup presence and
+	// retrying rather than blindly toggling.
+	async function openPopup() {
+		const trigger = document.querySelector(RG.SEL.guestTrigger);
+		if (!trigger) return { trigger: null, popup: null };
+		for (let attempt = 0; attempt < 3; attempt++) {
+			if (trigger.getAttribute('aria-expanded') === 'true' || findOpenPopup()) {
+				const p = await waitForPopup(1200);
+				if (p) return { trigger, popup: p };
+			}
+			press(trigger);
+			const p = await waitForPopup(1200);
+			if (p) return { trigger, popup: p };
+		}
+		return { trigger, popup: findOpenPopup() };
+	}
+
+	// Current count from the popup's number input (text input with digits).
+	function readFromPopup(popup) {
+		if (!popup) return null;
+		const input = popup.querySelector('input[name="numberField"], .rec-guest-counter-row input, input[type="number"], input[inputmode="numeric"]');
+		if (input) {
+			const v = (input.value || '').replace(/\D/g, '');
+			if (v !== '') return parseInt(v, 10);
+		}
+		const spin = popup.querySelector('[role="spinbutton"][aria-valuenow]');
+		if (spin) return parseInt(spin.getAttribute('aria-valuenow'), 10);
+		return null;
 	}
 
 	function findStepperButtons(popup) {
-		const buttons = [...popup.querySelectorAll('button')];
-		const inc = buttons.find((b) => /add|increase|increment|plus|\+|more/i.test(
-			(b.getAttribute('aria-label') || '') + ' ' + b.className
-		)) || buttons.find((b) => b.querySelector('use[href*="add"], use[href*="plus"]'));
-		const dec = buttons.find((b) => /remove|decrease|decrement|minus|subtract|fewer/i.test(
-			(b.getAttribute('aria-label') || '') + ' ' + b.className
-		)) || buttons.find((b) => b.querySelector('use[href*="subtract"], use[href*="minus"], use[href*="remove"]'));
+		const buttons = [...popup.querySelectorAll('button, [role="button"]')];
+		const txt = (b) => ((b.getAttribute('aria-label') || '') + ' ' + b.className + ' ' + (b.textContent || ''));
+		const icon = (b, ...frags) => frags.some((f) => b.querySelector(`use[href*="${f}"]`));
+		const inc = buttons.find((b) => /\badd\b|increase|increment|\bplus\b|\bmore\b/i.test(txt(b)))
+			|| buttons.find((b) => icon(b, 'add', 'plus'))
+			|| buttons.find((b) => /^[+]$/.test((b.textContent || '').trim()));
+		const dec = buttons.find((b) => /remove|decrease|decrement|minus|subtract|\bfewer\b/i.test(txt(b)))
+			|| buttons.find((b) => icon(b, 'subtract', 'minus', 'remove'))
+			|| buttons.find((b) => /^[-−–]$/.test((b.textContent || '').trim()));
 		return { inc, dec };
 	}
 
-	async function setGroupSize(target, { maxSteps = 60 } = {}) {
+	async function setGroupSize(target, { maxSteps = 80 } = {}) {
 		target = parseInt(target, 10);
 		if (!Number.isFinite(target) || target < 1) return { ok: false, reason: 'bad-target' };
 
-		const trigger = document.querySelector(RG.SEL.guestTrigger);
-		if (!trigger) return { ok: false, reason: 'no-trigger' };
-
 		if (readCurrentFromTrigger() === target) return { ok: true, value: target };
 
-		if (trigger.getAttribute('aria-expanded') !== 'true') trigger.click();
-		let popup;
-		try {
-			popup = await RG.waitFor(RG.SEL.guestPopup + ' button, ' + RG.SEL.guestPopup + ' input',
-				{ timeout: 4000 });
-			popup = document.querySelector(RG.SEL.guestPopup);
-		} catch {
-			return { ok: false, reason: 'popup-timeout' };
-		}
+		const { trigger, popup } = await openPopup();
+		if (!trigger) return { ok: false, reason: 'no-trigger' };
+		if (!popup) return { ok: false, reason: 'popup-not-found' };
 
-		// Preferred path: a real number input we can set directly.
-		const numInput = popup.querySelector('input[type="number"], input[inputmode="numeric"]');
-		if (numInput) {
-			RG.setReactInputValue(numInput, String(target));
-			await RG.sleep(150);
-			if (readCurrentFromTrigger() === target) {
-				closePopup(trigger, popup);
-				return { ok: true, value: target, via: 'input' };
-			}
-		}
-
-		// Fallback: drive the +/- stepper.
 		const { inc, dec } = findStepperButtons(popup);
+		if (!inc && !dec) {
+			commit(trigger, popup);
+			return { ok: false, reason: 'no-stepper', hint: 'run RG.autofill.dumpPopup()' };
+		}
+
+		// Drive the steppers, reading the real value each iteration so any
+		// double-fire self-corrects (overshoot -> click the other direction).
 		let steps = 0;
+		let lastSeen = readFromPopup(popup) ?? readCurrentFromTrigger() ?? 0;
 		while (steps++ < maxSteps) {
-			const cur = readCurrentFromTrigger();
-			if (cur == null) break;
+			const read = readFromPopup(popup) ?? readCurrentFromTrigger();
+			const cur = read == null ? lastSeen : read;
 			if (cur === target) break;
-			const btn = cur < target ? inc : dec;
+			const goUp = cur < target;
+			const btn = goUp ? inc : dec;
 			if (!btn || btn.disabled) break;
-			btn.click();
+			press(btn);
+			lastSeen = cur + (goUp ? 1 : -1);
 			await RG.sleep(80);
 		}
 
-		const final = readCurrentFromTrigger();
-		closePopup(trigger, popup);
+		const reached = readFromPopup(popup);
+		commit(trigger, popup);
+		await RG.sleep(180);
+		const final = readCurrentFromTrigger() ?? reached ?? lastSeen;
 		return { ok: final === target, value: final, via: 'stepper' };
 	}
 
-	function closePopup(trigger, popup) {
-		const done = popup && [...popup.querySelectorAll('button')]
-			.find((b) => /done|apply|close|update/i.test(b.textContent || ''));
-		if (done) { done.click(); return; }
+	// Close the dropdown so the SPA commits the selection and fetches availability.
+	function commit(trigger, popup) {
+		const apply = popup && [...popup.querySelectorAll('button')]
+			.find((b) => /done|apply|update|save|confirm|search|show results/i.test(b.textContent || ''));
+		if (apply) press(apply);
 		document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-		if (trigger.getAttribute('aria-expanded') === 'true') trigger.click();
+		if (trigger && trigger.getAttribute('aria-expanded') === 'true') press(trigger);
 	}
 
-	window.RG.autofill = { setGroupSize, readCurrentFromTrigger };
+	async function dumpPopup() {
+		const { popup } = await openPopup();
+		const html = popup ? popup.outerHTML : '(popup not found — react-aria may mount elsewhere)';
+		RG.log('GUEST POPUP MARKUP:\n', html);
+		return html;
+	}
+
+	window.RG.autofill = {
+		setGroupSize, readCurrentFromTrigger, readFromPopup, findStepperButtons,
+		findOpenPopup, press, openPopup, dumpPopup
+	};
 })();

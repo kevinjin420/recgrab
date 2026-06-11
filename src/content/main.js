@@ -36,6 +36,9 @@
 			case 'rg:applyGroupSize':
 				RG.autofill.setGroupSize(msg.size).then((r) => sendResponse(r));
 				return true; // async
+			case 'rg:dumpPopup':
+				RG.autofill.dumpPopup().then((html) => sendResponse({ html }));
+				return true; // async
 			case 'rg:reapply':
 				RG.getConfig().then((c) => { config = c; rerun(); sendResponse({ ok: true }); });
 				return true;

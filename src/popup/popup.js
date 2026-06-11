@@ -101,6 +101,11 @@ function render() {
 	$('minAvailable').value = state.cfg.minAvailable ?? 1;
 	updateArmedDot();
 
+	// Unset state: recreation.gov hides availability until a group size is set.
+	const needs = !!state.scan.needsGroupSize;
+	$('unsetBanner').hidden = !needs;
+	if (needs) $('bGroupSize').value = state.cfg.groupSize ?? state.scan.currentGroupSize ?? 2;
+
 	renderEntryPoints();
 	renderDates();
 	updateMatchSummary();
@@ -114,7 +119,10 @@ function renderEntryPoints(filterText = '') {
 		!q || ep.name.toLowerCase().includes(q) || ep.id.includes(q) || ep.area.toLowerCase().includes(q));
 
 	if (!items.length) {
-		list.innerHTML = '<div class="ep-empty">No entry points match.</div>';
+		const msg = state.scan.entryPoints.length === 0
+			? 'Set a group size above to load entry points.'
+			: 'No entry points match your search.';
+		list.innerHTML = `<div class="ep-empty">${msg}</div>`;
 		return;
 	}
 
@@ -213,6 +221,10 @@ function wire() {
 	$('selOpen').addEventListener('click', () => bulkSelect('open'));
 
 	$('applyGroup').addEventListener('click', applyGroupNow);
+	$('bPlus').addEventListener('click', () => bumpBanner(1));
+	$('bMinus').addEventListener('click', () => bumpBanner(-1));
+	$('loadBtn').addEventListener('click', loadAvailability);
+	$('dumpLink').addEventListener('click', copyDiagnostics);
 	$('retryBtn').addEventListener('click', init);
 	$('saveBtn').addEventListener('click', () => window.close());
 	$('clearBtn').addEventListener('click', clearConfig);
@@ -237,6 +249,65 @@ function bulkSelect(mode) {
 	persist();
 	renderEntryPoints($('epSearch').value);
 	updateMatchSummary();
+}
+
+// Opens the live guest popup, grabs its markup, and copies it to the clipboard
+// so the exact (portal-rendered) structure can be shared for targeting.
+async function copyDiagnostics() {
+	const link = $('dumpLink');
+	const orig = link.textContent;
+	link.textContent = 'Reading popup…';
+	try {
+		const res = await send('rg:dumpPopup');
+		const html = res?.html || '(no markup returned)';
+		await navigator.clipboard.writeText(html);
+		link.textContent = 'Copied — paste it to the developer';
+	} catch {
+		link.textContent = 'Couldn\'t read popup';
+	}
+	setTimeout(() => (link.textContent = orig), 2600);
+}
+
+function bumpBanner(delta) {
+	const cur = parseInt($('bGroupSize').value, 10) || 0;
+	$('bGroupSize').value = Math.max(1, cur + delta);
+}
+
+// Unset-state unlock: set the group size on the page, then poll until the grid
+// renders its entry points and re-render the configurator.
+async function loadAvailability() {
+	const n = Math.max(1, parseInt($('bGroupSize').value, 10) || 2);
+	state.cfg.groupSize = n;
+	persist();
+	const btn = $('loadBtn');
+	const orig = btn.textContent;
+	btn.disabled = true;
+	btn.textContent = `Setting ${n}…`;
+	try {
+		await send('rg:applyGroupSize', { size: n });
+	} catch {
+		btn.disabled = false;
+		btn.textContent = 'Page not ready';
+		setTimeout(() => (btn.textContent = orig), 1500);
+		return;
+	}
+	btn.textContent = 'Loading availability…';
+	const ok = await rescanUntilReady();
+	btn.disabled = false;
+	btn.textContent = ok ? orig : 'Try again';
+	setTimeout(() => (btn.textContent = orig), 1600);
+}
+
+async function rescanUntilReady(tries = 8, delay = 700) {
+	for (let i = 0; i < tries; i++) {
+		await new Promise((r) => setTimeout(r, delay));
+		let scan;
+		try { scan = await send('rg:scan'); } catch { continue; }
+		if (scan) state.scan = scan;
+		if (scan && scan.ready && scan.entryPoints.length) { render(); return true; }
+	}
+	render();
+	return false;
 }
 
 async function applyGroupNow() {

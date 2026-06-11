@@ -124,6 +124,11 @@ h1, h2 { margin: 0; }
 .btn-secondary { background: var(--blue); color: #fff; }
 .btn-secondary:hover { background: var(--blue-dk); }
 
+/* Unset-state banner */
+.banner { background: #cfe8ff; border-bottom: 1px solid #97d4ea; }
+.banner-title { margin: 0 0 2px; font-weight: 700; color: var(--blue-dk); }
+.banner-sub { margin: 0 0 9px; font-size: 12px; color: var(--gray); }
+
 /* Warning */
 .warn { margin: 9px 0 0; font-size: 11px; color: var(--warn); background: #fff; border: 1px solid #f0e2c4; padding: 7px 9px; border-radius: var(--radius); }
 

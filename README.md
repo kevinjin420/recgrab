@@ -28,6 +28,17 @@ recreation.gov's own palette and Open Sans typography.
    content script applies your filtering/highlighting (and group size / auto-grab
    if enabled). A small floating panel shows live status + quick kill switches.
 
+### First-visit "unset" state
+
+When no group size is set, recreation.gov shows the placeholder **"Add Group
+Members…"** and **hides all availability** (the grid renders headers only — no
+entry-point rows). RecGrab detects this (`scanOptions().needsGroupSize`) and the
+popup shows a **"Set a group size to load availability"** banner with its own
+stepper + **Set & load** button. Clicking it sets the group size on the page and
+auto-rescans until the entry points appear. Because `autoSetGroupSize` defaults
+to **on**, a saved group size is applied automatically on later visits, so the
+grid unlocks itself.
+
 > ⚠️ **Use responsibly.** This is a convenience/accessibility helper, not a bot.
 > Auto-grab deliberately **stops after opening a date** and never touches
 > reCAPTCHA, the cart, payment, or final purchase. Rapid automated booking can
@@ -132,8 +143,11 @@ to ISO dates by parsing the header row's screen-reader date labels
 - **Booking completion is intentionally out of scope.** RecGrab opens a date and
   hands control back to you to handle date confirmation, captcha, and checkout.
 - The guest-counter popup markup isn't in the static capture, so `autofill.js`
-  uses a resilient strategy (number input first, then +/- stepper, then close).
-  If Recreation.gov changes that widget, adjust `findStepperButtons()`.
+  uses a resilient strategy: prefer a number input, else read the popup's own
+  value display, else count our own +/- clicks from an assumed 0 (this last part
+  is what makes setting the count work from the "Add Group Members…" placeholder
+  state, where the trigger shows no number). If Recreation.gov changes that
+  widget, adjust `findStepperButtons()` / `readFromPopup()`.
 - Selectors may drift if the site updates its design system. Update `SEL` in
   `core.js` if filtering stops matching.
 - No analytics, no network calls, no data leaves your browser. Config is stored

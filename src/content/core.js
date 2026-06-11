@@ -14,7 +14,7 @@
 		enabled: true,
 		watchlist: [], // entry-point IDs (preferred) or name substrings
 		groupSize: null, // desired "Group Members" count; null = leave alone
-		autoSetGroupSize: false,
+		autoSetGroupSize: true, // set group size on load so availability unlocks
 		minAvailable: 1, // a date cell counts as a match when remaining >= this
 		hideNonMatchingRows: true,
 		hideRowsWithNoMatch: false,
@@ -187,6 +187,24 @@
 
 	const log = (...args) => console.debug('%c[RecGrab]', 'color:#466c04;font-weight:bold', ...args);
 
+	// Current group-members count from the trigger label, or null if unset.
+	function readGroupSize() {
+		const t = document.querySelector(SEL.guestTrigger);
+		if (!t) return null;
+		const m = (t.textContent || '').match(/(\d+)/);
+		return m ? parseInt(m[1], 10) : null;
+	}
+
+	// True when no group size is set yet ("Add Group Members..." placeholder).
+	// In this state recreation.gov hides availability, so the grid has no rows.
+	function isGuestPlaceholder() {
+		const t = document.querySelector(SEL.guestTrigger);
+		if (!t) return false;
+		const base = t.closest('.sarsa-dropdown-base');
+		if (base && base.classList.contains('is-placeholder')) return true;
+		return !/\d/.test(t.textContent || '');
+	}
+
 	// Scan the live grid into structured rows.
 	function scanGrid() {
 		const grid = document.querySelector(SEL.grid) || document.querySelector(SEL.anyGrid);
@@ -245,8 +263,7 @@
 			};
 		});
 
-		const guest = document.querySelector(SEL.guestTrigger);
-		const gm = guest && (guest.textContent || '').match(/(\d+)/);
+		const placeholder = isGuestPlaceholder();
 
 		return {
 			ready: true,
@@ -255,7 +272,11 @@
 			id: ctx.id,
 			isAvailabilityPage: ctx.isAvailabilityPage,
 			label: pageLabel(ctx),
-			currentGroupSize: gm ? parseInt(gm[1], 10) : null,
+			currentGroupSize: readGroupSize(),
+			guestPlaceholder: placeholder,
+			// Availability is hidden until a group size is chosen; entry points
+			// only render once it is. Either signal means "set group size first".
+			needsGroupSize: placeholder || entryPoints.length === 0,
 			dates,
 			entryPoints
 		};
@@ -264,7 +285,7 @@
 	window.RG = {
 		DEFAULT_CONFIG, SEL, pageContext, contextKey, parsePeople, cellState,
 		buildColumnDateMap, readRow, matchesWatchlist, setReactInputValue,
-		waitFor, sleep, log, isoFromDate,
+		waitFor, sleep, log, isoFromDate, readGroupSize, isGuestPlaceholder,
 		getAllConfigs, getConfig, setConfig, deleteConfig, onConfigChange,
 		scanGrid, scanOptions, pageLabel
 	};
