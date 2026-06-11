@@ -81,7 +81,24 @@
 			<div class="block-head"><h2>Auto-grab dates</h2></div>
 			<p class="muted">Add the exact dates RecGrab may click for your selected entry points. Flip <strong>Armed</strong> in the header to go live (global — works on every saved page).</p>
 			<div class="date-add-row">
-				<input type="date" id="targetDateInput" class="date-input" />
+				<div class="calendar-wrap" id="calendarWrap">
+					<button id="dateTrigger" class="date-trigger" type="button" aria-expanded="false" aria-controls="calendarPanel">
+						<span id="dateTriggerText">Pick a date</span>
+						<span class="date-trigger-icon">▾</span>
+					</button>
+					<input type="hidden" id="targetDateInput" />
+					<div id="calendarPanel" class="calendar-panel" hidden>
+						<div class="calendar-head">
+							<button id="calPrev" class="calendar-nav" type="button" aria-label="Previous month">‹</button>
+							<strong id="calTitle"></strong>
+							<button id="calNext" class="calendar-nav" type="button" aria-label="Next month">›</button>
+						</div>
+						<div class="calendar-weekdays" aria-hidden="true">
+							<span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+						</div>
+						<div id="calGrid" class="calendar-grid" role="grid" aria-label="Choose target date"></div>
+					</div>
+				</div>
 				<button id="addDateBtn" class="btn btn-secondary" type="button">Add date</button>
 			</div>
 			<div id="dateList" class="date-list" role="group" aria-label="Target dates"></div>

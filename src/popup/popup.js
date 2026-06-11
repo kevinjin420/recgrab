@@ -15,6 +15,7 @@ const BOOLS = ['highlightMatches', 'hideNonMatchingRows', 'hideRowsWithNoMatch',
 const $ = (id) => document.getElementById(id);
 
 const state = { tabId: null, scan: null, key: null, cfg: { ...DEFAULTS } };
+let calendarMonth = firstOfMonth(new Date());
 
 // ---- storage (per-context) ----
 async function getConfigs() {
@@ -142,6 +143,7 @@ function render() {
 
 	renderEntryPoints();
 	renderDates();
+	renderCalendar();
 }
 
 function renderEntryPoints(filterText = '') {
@@ -221,6 +223,7 @@ function renderDates() {
 			state.cfg.targetDates = (state.cfg.targetDates || []).filter((x) => x !== iso);
 			persist();
 			renderDates();
+			renderCalendar();
 		});
 		wrap.appendChild(chip);
 	});
@@ -233,6 +236,88 @@ function targetDateParts(iso) {
 		short: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
 		label: d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
 	};
+}
+
+function firstOfMonth(d) {
+	return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+function isoFromLocalDate(d) {
+	const yyyy = d.getFullYear();
+	const mm = String(d.getMonth() + 1).padStart(2, '0');
+	const dd = String(d.getDate()).padStart(2, '0');
+	return `${yyyy}-${mm}-${dd}`;
+}
+
+function selectedDateLabel() {
+	const iso = $('targetDateInput').value;
+	return iso ? targetDateParts(iso).label : 'Pick a date';
+}
+
+function renderCalendar() {
+	if (!$('calGrid')) return;
+	$('dateTriggerText').textContent = selectedDateLabel();
+	$('calTitle').textContent = calendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+	const grid = $('calGrid');
+	grid.innerHTML = '';
+	const startOffset = calendarMonth.getDay();
+	const month = calendarMonth.getMonth();
+	const year = calendarMonth.getFullYear();
+	const daysInMonth = new Date(year, month + 1, 0).getDate();
+	const selected = $('targetDateInput').value;
+	const saved = new Set(state.cfg.targetDates || []);
+
+	for (let i = 0; i < startOffset; i++) grid.appendChild(blankDay());
+	for (let day = 1; day <= daysInMonth; day++) {
+		const date = new Date(year, month, day);
+		const iso = isoFromLocalDate(date);
+		const btn = document.createElement('button');
+		btn.type = 'button';
+		btn.className = 'calendar-day';
+		btn.textContent = String(day);
+		btn.setAttribute('role', 'gridcell');
+		btn.setAttribute('aria-label', targetDateParts(iso).label);
+		btn.classList.toggle('selected', iso === selected);
+		btn.classList.toggle('saved', saved.has(iso));
+		btn.addEventListener('click', () => {
+			$('targetDateInput').value = iso;
+			$('dateTriggerText').textContent = targetDateParts(iso).label;
+			closeCalendar();
+			renderCalendar();
+		});
+		grid.appendChild(btn);
+	}
+}
+
+function blankDay() {
+	const span = document.createElement('span');
+	span.className = 'calendar-day blank';
+	return span;
+}
+
+function toggleCalendar() {
+	const panel = $('calendarPanel');
+	panel.hidden ? openCalendar() : closeCalendar();
+}
+
+function openCalendar() {
+	$('calendarPanel').hidden = false;
+	$('dateTrigger').setAttribute('aria-expanded', 'true');
+	renderCalendar();
+}
+
+function closeCalendar() {
+	$('calendarPanel').hidden = true;
+	$('dateTrigger').setAttribute('aria-expanded', 'false');
+}
+
+function closeCalendarOnOutsideClick(e) {
+	if ($('calendarWrap') && !$('calendarWrap').contains(e.target)) closeCalendar();
+}
+
+function moveCalendarMonth(delta) {
+	calendarMonth = firstOfMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + delta, 1));
+	renderCalendar();
 }
 
 // ---- control wiring ----
@@ -251,9 +336,10 @@ function wire() {
 	$('selNone').addEventListener('click', () => bulkSelect('none'));
 	$('selOpen').addEventListener('click', () => bulkSelect('open'));
 	$('addDateBtn').addEventListener('click', addTargetDateFromInput);
-	$('targetDateInput').addEventListener('keydown', (e) => {
-		if (e.key === 'Enter') addTargetDateFromInput();
-	});
+	$('dateTrigger').addEventListener('click', toggleCalendar);
+	$('calPrev').addEventListener('click', () => moveCalendarMonth(-1));
+	$('calNext').addEventListener('click', () => moveCalendarMonth(1));
+	document.addEventListener('click', closeCalendarOnOutsideClick);
 
 	$('bPlus').addEventListener('click', () => bumpBanner(1));
 	$('bMinus').addEventListener('click', () => bumpBanner(-1));
@@ -292,12 +378,17 @@ function addTargetDate(iso) {
 	state.cfg.targetDates = [...set].sort();
 	persist();
 	renderDates();
+	renderCalendar();
 	return true;
 }
 
 function addTargetDateFromInput() {
 	const input = $('targetDateInput');
-	if (addTargetDate(input.value)) input.value = '';
+	if (addTargetDate(input.value)) {
+		input.value = '';
+		$('dateTriggerText').textContent = 'Pick a date';
+		renderCalendar();
+	}
 }
 
 // Opens the live guest popup, grabs its markup, and copies it to the clipboard
