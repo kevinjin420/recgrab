@@ -16,8 +16,8 @@
 		return n;
 	}
 
-	function render(config) {
-		if (root) { update(config); return; }
+	function render(state) {
+		if (root) { update(state); return; }
 
 		root = el('div', { id: 'rg-panel', class: 'rg-panel' });
 		const head = el('div', { class: 'rg-panel-head' },
@@ -29,9 +29,9 @@
 		const status = el('div', { class: 'rg-status', id: 'rg-status' }, 'Scanning…');
 
 		const body = el('div', { class: 'rg-panel-body' },
-			quickToggle('Filtering', 'enabled', config),
-			quickToggle('Auto-grab', 'autoGrab', config, true),
-			el('p', { class: 'rg-hint' }, 'Configure entry points & group size from the toolbar popup.')
+			globalToggle('Extension on', 'enabled', state),
+			globalToggle('Armed', 'armed', state, true),
+			el('p', { class: 'rg-hint' }, 'On/Armed are global. Configure entry points, group size & dates from the toolbar popup.')
 		);
 
 		// --- Temporary diagnostics (debug "Book Now" not clicking) ---
@@ -51,6 +51,7 @@
 
 		root.append(head, status, body, diag);
 		document.body.appendChild(root);
+		update(state);
 
 		window.addEventListener('rg:status', (e) => setStatus(e.detail));
 		window.addEventListener('rg:matchcount', (e) => {
@@ -89,7 +90,9 @@
 	// Report the best grab target for the current saved config.
 	async function diagTarget() {
 		const cfg = await RG.getConfig();
-		logLine(`config: enabled=${cfg.enabled} autoGrab=${cfg.autoGrab} group=${cfg.groupSize} watch=[${(cfg.watchlist || []).join(',')}] dates=[${(cfg.targetDates || []).join(',')}]`);
+		const g = await RG.getGlobals();
+		logLine(`globals: on=${g.enabled} armed=${g.armed}`);
+		logLine(`config: group=${cfg.groupSize} watch=[${(cfg.watchlist || []).join(',')}] dates=[${(cfg.targetDates || []).join(',')}]`);
 		const t = RG.autograb.findGrabTarget(cfg);
 		if (!t) { logLine('grab target: none (no matching open cell for current filters)'); return; }
 		logLine(`grab target: ${t.row.name} · ${t.date.iso} · ${t.date.remaining} spots · btnDisabled=${!!t.date.btnEl.disabled}`);
@@ -102,22 +105,35 @@
 		logLine('manual: clickBookNow -> ' + (ok ? 'CLICKED' : 'failed (see above)'));
 	}
 
-	function quickToggle(label, key, config, danger) {
+	function globalToggle(label, key, state, danger) {
 		const input = el('input', { type: 'checkbox' });
-		input.checked = !!config[key];
-		input.dataset.key = key;
-		input.addEventListener('change', () => RG.setConfig({ [key]: input.checked }));
-		return el('label', { class: 'rg-row rg-toggle' + (danger ? ' rg-danger' : '') },
+		input.checked = !!state[key];
+		input.dataset.gkey = key;
+		input.addEventListener('change', () => {
+			// Turning the extension off also disarms.
+			const patch = { [key]: input.checked };
+			if (key === 'enabled' && !input.checked) patch.armed = false;
+			RG.setGlobals(patch);
+		});
+		return el('label', { class: 'rg-row rg-toggle' + (danger ? ' rg-danger' : ''), 'data-row': key },
 			input, el('span', {}, label));
 	}
 
-	function update(config) {
+	function update(state) {
 		if (!root) return;
-		root.querySelectorAll('input[type="checkbox"][data-key]').forEach((i) => {
-			i.checked = !!config[i.dataset.key];
+		root.querySelectorAll('input[type="checkbox"][data-gkey]').forEach((i) => {
+			i.checked = !!state[i.dataset.gkey];
 		});
+		// Gray out + disable Armed when the extension is off.
+		const armedInput = root.querySelector('input[data-gkey="armed"]');
+		const armedRow = root.querySelector('[data-row="armed"]');
+		if (armedInput) armedInput.disabled = !state.enabled;
+		if (armedRow) armedRow.classList.toggle('rg-disabled', !state.enabled);
 		const dot = document.getElementById('rg-dot');
-		if (dot) dot.classList.toggle('rg-dot-armed', !!config.autoGrab);
+		if (dot) {
+			dot.classList.toggle('rg-dot-armed', !!(state.enabled && state.armed));
+			dot.classList.toggle('rg-dot-off', !state.enabled);
+		}
 	}
 
 	function setStatus(text) {

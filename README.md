@@ -1,4 +1,4 @@
-# RecGrab — Recreation.gov Availability Helper
+ # RecGrab — Recreation.gov Availability Helper
 
 A Manifest V3 Chrome extension that makes Recreation.gov **Detailed Availability**
 grids (wilderness permits and campgrounds) easier to scan and act on:
@@ -20,13 +20,17 @@ recreation.gov's own palette and Open Sans typography.
 2. Click the **RecGrab** toolbar icon. The popup **scans the page** and lists the
    real entry points (with live open-spot counts) and the visible date columns.
 3. Pick the entry points to watch, set your group size, choose highlight options,
-   and (optionally) select target dates and arm auto-grab.
-4. Everything **auto-saves to `chrome.storage.sync`, keyed by the permit/campground
-   ID** (e.g. `permits:445859`) — stable across visits even though the URL's
-   `?date=&type=` params change.
-5. Next time you open that page, the saved config loads automatically and the
-   content script applies your filtering/highlighting (and group size / auto-grab
-   if enabled). A small floating panel shows live status + quick kill switches.
+   and (optionally) select target dates.
+4. Per-page settings **auto-save to `chrome.storage.sync`, keyed by the permit/
+   campground ID** (e.g. `permits:445859`) — stable across visits even though the
+   URL's `?date=&type=` params change.
+5. **On** and **Armed** are two global switches in the popup header (and the
+   floating panel). They are **universal** — stored as top-level sync flags — so
+   you can arm on one page and **disarm from any other page/tab**. `Armed` is
+   grayed out while the extension is **Off**, and turning **Off** also disarms.
+6. Next time you open a saved page, the config loads automatically and the content
+   script applies your filtering/highlighting (and group size). If globally
+   **Armed**, any saved page with target entry points/dates auto-grabs.
 
 ### First-visit "unset" state
 
@@ -35,15 +39,16 @@ Members…"** and **hides all availability** (the grid renders headers only — 
 entry-point rows). RecGrab detects this (`scanOptions().needsGroupSize`) and the
 popup shows a **"Set a group size to load availability"** banner with its own
 stepper + **Set & load** button. Clicking it sets the group size on the page and
-auto-rescans until the entry points appear. Because `autoSetGroupSize` defaults
-to **on**, a saved group size is applied automatically on later visits, so the
-grid unlocks itself.
+auto-rescans until the entry points appear. A saved group size is always applied
+automatically on later visits, so the grid unlocks itself.
 
 > ⚠️ **Use responsibly.** This is a convenience/accessibility helper, not a bot.
-> Auto-grab deliberately **stops after opening a date** and never touches
-> reCAPTCHA, the cart, payment, or final purchase. Rapid automated booking can
-> violate Recreation.gov's Terms of Service and may get your account blocked.
-> Keep the auto-grab interval reasonable and don't hammer the site.
+> When armed, auto-grab selects a matching date and clicks **Book Now** to lock
+> the slot, then **stays armed until you turn it off** (here or from any page). It
+> never touches reCAPTCHA, the cart, payment, or final purchase — you finish
+> checkout. Rapid automated booking can violate Recreation.gov's Terms of Service
+> and may get your account blocked. Keep the interval reasonable and don't hammer
+> the site.
 
 ---
 
@@ -126,17 +131,17 @@ to ISO dates by parsing the header row's screen-reader date labels
 
 | Setting | Effect |
 | --- | --- |
-| Enable on this page | Master switch for this page's config |
+| On (global) | Master switch for the whole extension; turning it off disarms |
+| Armed (global) | Auto-grab is live on every saved page; grayed out while Off |
 | Entry points | Checkbox list scanned from the page (name, area, ID, open count). All / None / Open-only shortcuts + search. Selection is stored as entry-point IDs |
-| Group size | Number of people; stepper or type. "Set on page" drives the guest counter now |
-| Auto-set group size on load | Apply the group size automatically when the page loads |
+| Group size | Number of people; stepper or type. Saved group sizes are always applied automatically when the page loads |
 | Highlight open matches | Pulsing outline on bookable cells meeting the spot threshold |
 | Hide unselected rows | Collapse rows not in your selection |
 | Hide selected rows with nothing open | Hide watched rows with no open date in view |
 | Dim unavailable / not-released | De-emphasize cells you can't book |
-| Min open spots | Threshold for what counts as a "match" |
 | Target dates | Date chips scanned from the page; the dates auto-grab may click |
-| Arm auto-grab | Poll + click the first open target-date cell for a selected row, then stop |
+| On (global) | Master on/off for the whole extension; toggling off disarms |
+| Armed (global) | Auto-grab is live on every saved page; clicks the date cell then **Book Now**, stays armed until turned off |
 
 ## Limitations & notes
 

@@ -74,6 +74,9 @@
 .rg-toggle input { width: 16px; height: 16px; accent-color: #466c04; }
 .rg-toggle.rg-danger span { color: #b84a4a; font-weight: 600; }
 .rg-toggle.rg-danger input { accent-color: #b84a4a; }
+.rg-toggle.rg-disabled { opacity: 0.4; cursor: not-allowed; }
+.rg-toggle.rg-disabled span { color: #6a7381; }
+.rg-panel-head .rg-dot.rg-dot-off { background: #b0b6bd; box-shadow: none; animation: none; }
 .rg-hint { margin: 2px 0 0; font-size: 11px; color: #6a7381; line-height: 1.35; }
 
 /* Temporary diagnostics */

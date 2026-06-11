@@ -6,11 +6,29 @@
 	const ctx = RG.pageContext();
 
 	let config = null;
+	let globals = { enabled: true, armed: false };
+	let grabbing = false;
 	let debounceTimer = null;
+
+	// Effective config passed downstream: per-page settings + the global on/off.
+	function eff() { return { ...config, enabled: globals.enabled }; }
+	function panelState() { return { enabled: globals.enabled, armed: globals.armed }; }
+	function hasTargets() {
+		return !!((config.watchlist && config.watchlist.length) ||
+			(config.targetDates && config.targetDates.length));
+	}
+
+	// Start/stop auto-grab based on the global flags + whether this page has
+	// anything configured to grab. Called whenever globals or config change.
+	function refreshAutograb() {
+		const shouldRun = globals.enabled && globals.armed && hasTargets();
+		if (shouldRun && !grabbing) { grabbing = true; RG.autograb.start(eff()); }
+		else if (!shouldRun && grabbing) { grabbing = false; RG.autograb.stop(); }
+	}
 
 	function rerun() {
 		if (!config) return;
-		const result = RG.filter.apply(config);
+		const result = RG.filter.apply(eff());
 		window.dispatchEvent(new CustomEvent('rg:matchcount', { detail: result }));
 	}
 
@@ -49,37 +67,46 @@
 		}
 	}); } catch {}
 
+	function maybeAutoSetGroup() {
+		if (globals.enabled && config.groupSize &&
+			RG.autofill.readCurrentFromTrigger() !== config.groupSize) {
+			RG.autofill.setGroupSize(config.groupSize).then((r) => RG.log('group size', r));
+		}
+	}
+
 	async function boot() {
 		config = await RG.getConfig();
+		globals = await RG.getGlobals();
 
 		if (!ctx.isAvailabilityPage) {
 			RG.log('not an availability page; messaging only');
 			return;
 		}
 
-		await RG.panel.render(config);
+		await RG.panel.render(panelState());
 		observeGrid();
 		rerun();
+		maybeAutoSetGroup();
+		refreshAutograb();
 
-		if (config.enabled && config.autoSetGroupSize && config.groupSize) {
-			RG.autofill.setGroupSize(config.groupSize).then((r) => RG.log('initial group size', r));
-		}
-		if (config.enabled && config.autoGrab) RG.autograb.start(config);
-
+		// Per-page config changed (popup edits): re-decorate + re-evaluate grab.
 		RG.onConfigChange((next) => {
-			const wasGrabbing = config.autoGrab;
 			const prevSize = config.groupSize;
 			config = next;
 			RG.autograb.resetClickGuard();
 			rerun();
-			RG.panel.update(next);
+			if (next.groupSize !== prevSize) maybeAutoSetGroup();
+			refreshAutograb();
+		});
 
-			if (next.enabled && next.autoSetGroupSize && next.groupSize &&
-				(next.groupSize !== prevSize || RG.autofill.readCurrentFromTrigger() !== next.groupSize)) {
-				RG.autofill.setGroupSize(next.groupSize);
-			}
-			if (next.enabled && next.autoGrab && !wasGrabbing) RG.autograb.start(next);
-			if ((!next.enabled || !next.autoGrab) && wasGrabbing) RG.autograb.stop();
+		// Global on/off or armed changed (this or any other tab/popup).
+		RG.onGlobalsChange(async () => {
+			globals = await RG.getGlobals();
+			RG.autograb.resetClickGuard();
+			rerun();
+			RG.panel.update(panelState());
+			if (globals.enabled) maybeAutoSetGroup();
+			refreshAutograb();
 		});
 	}
 

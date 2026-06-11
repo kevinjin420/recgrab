@@ -4,14 +4,13 @@
 // and applies filtering/highlighting live.
 
 const DEFAULTS = {
-	label: '', enabled: true, watchlist: [], groupSize: null, autoSetGroupSize: false,
-	minAvailable: 1, hideNonMatchingRows: true, hideRowsWithNoMatch: false,
-	dimUnavailable: true, highlightMatches: true, autoGrab: false,
-	targetDates: [], autoGrabIntervalMs: 4000, updatedAt: 0
+	label: '', watchlist: [], groupSize: null,
+	hideNonMatchingRows: true, hideRowsWithNoMatch: false,
+	dimUnavailable: true, highlightMatches: true,
+	targetDates: [], autoGrabIntervalMs: 3000, updatedAt: 0
 };
 
-const BOOLS = ['enabled', 'autoSetGroupSize', 'highlightMatches', 'hideNonMatchingRows',
-	'hideRowsWithNoMatch', 'dimUnavailable', 'autoGrab'];
+const BOOLS = ['highlightMatches', 'hideNonMatchingRows', 'hideRowsWithNoMatch', 'dimUnavailable'];
 
 const $ = (id) => document.getElementById(id);
 
@@ -21,25 +20,61 @@ const state = { tabId: null, scan: null, key: null, cfg: { ...DEFAULTS } };
 async function getConfigs() {
 	return (await chrome.storage.sync.get('configs')).configs || {};
 }
+function normalizeConfig(raw = {}) {
+	const cfg = { ...DEFAULTS };
+	for (const k of ['label', 'watchlist', 'groupSize', 'hideNonMatchingRows',
+			'hideRowsWithNoMatch', 'dimUnavailable', 'highlightMatches', 'targetDates',
+			'autoGrabIntervalMs', 'updatedAt']) {
+		if (raw[k] !== undefined) cfg[k] = raw[k];
+	}
+	return cfg;
+}
 async function loadConfig(key) {
 	const all = await getConfigs();
-	return { ...DEFAULTS, ...(all[key] || {}) };
+	return normalizeConfig(all[key]);
 }
 let saveTimer;
 function persist() {
 	clearTimeout(saveTimer);
 	saveTimer = setTimeout(async () => {
 		const all = await getConfigs();
-		all[state.key] = { ...state.cfg, updatedAt: Date.now() };
+		all[state.key] = { ...normalizeConfig(state.cfg), updatedAt: Date.now() };
 		await chrome.storage.sync.set({ configs: all });
-		flashSaved();
 	}, 200);
 }
-function flashSaved() {
-	const b = $('savedBadge');
-	b.hidden = false;
-	clearTimeout(flashSaved._t);
-	flashSaved._t = setTimeout(() => (b.hidden = true), 1100);
+
+// ---- global flags (universal: master on/off + armed) ----
+async function getGlobals() {
+	const s = await chrome.storage.sync.get(['enabled', 'armed']);
+	return { enabled: s.enabled !== false, armed: !!s.armed };
+}
+async function setGlobals(patch) {
+	await chrome.storage.sync.set(patch);
+}
+function applyGlobalsUI(g) {
+	$('gEnabled').checked = g.enabled;
+	$('gArmed').checked = g.armed;
+	$('gArmed').disabled = !g.enabled;
+	$('armWrap').classList.toggle('disabled', !g.enabled);
+}
+// Header toggles work on EVERY page (even non-rec.gov), so wire them up front
+// and independently of the page scan — that's what lets you disarm from anywhere.
+async function wireGlobals() {
+	applyGlobalsUI(await getGlobals());
+	$('gEnabled').addEventListener('change', async () => {
+		const enabled = $('gEnabled').checked;
+		const patch = { enabled };
+		if (!enabled) patch.armed = false; // off disarms
+		await setGlobals(patch);
+		applyGlobalsUI(await getGlobals());
+	});
+	$('gArmed').addEventListener('change', async () => {
+		await setGlobals({ armed: $('gArmed').checked });
+		applyGlobalsUI(await getGlobals());
+	});
+	chrome.storage.onChanged.addListener((c, a) => {
+		if (a === 'sync' && (c.enabled || c.armed)) getGlobals().then(applyGlobalsUI);
+	});
 }
 
 // ---- messaging ----
@@ -67,7 +102,6 @@ async function init() {
 		return showState('This isn\'t a permit/campground availability page. Open one and try again.');
 	}
 	if (!scan.ready) {
-		$('pageLabel').textContent = scan.label || 'Recreation.gov';
 		return showState('Couldn\'t find the availability grid. Make sure it\'s visible, then scan.', true);
 	}
 
@@ -94,12 +128,9 @@ function render() {
 	$('stateMsg').hidden = true;
 	$('config').hidden = false;
 	$('footer').hidden = false;
-	$('pageLabel').textContent = state.cfg.label || state.scan.label;
 
 	BOOLS.forEach((k) => ($(k).checked = !!state.cfg[k]));
 	$('groupSize').value = state.cfg.groupSize ?? '';
-	$('minAvailable').value = state.cfg.minAvailable ?? 1;
-	updateArmedDot();
 
 	// Unset state: recreation.gov hides availability until a group size is set.
 	const needs = !!state.scan.needsGroupSize;
@@ -108,7 +139,6 @@ function render() {
 
 	renderEntryPoints();
 	renderDates();
-	updateMatchSummary();
 }
 
 function renderEntryPoints(filterText = '') {
@@ -128,24 +158,36 @@ function renderEntryPoints(filterText = '') {
 
 	items.forEach((ep) => {
 		const checked = state.cfg.watchlist.includes(ep.id);
+		const open = qualifiedOpen(ep);
 		const row = document.createElement('label');
-		row.className = 'ep-item';
+		row.className = 'ep-item' + (checked ? ' checked' : '');
 		row.innerHTML = `
 			<input type="checkbox" ${checked ? 'checked' : ''} />
 			<span class="ep-main">
 				<span class="ep-name"></span>
 				<span class="ep-meta"></span>
 			</span>
-			<span class="ep-badge ${ep.openCount ? 'has-open' : ''}"></span>`;
+			<span class="ep-badge ${open.count ? 'has-open' : ''}"></span>`;
 		row.querySelector('.ep-name').textContent = ep.name || `#${ep.id}`;
 		row.querySelector('.ep-meta').textContent =
-			`${ep.area ? ep.area + ' · ' : ''}ID ${ep.id}${ep.openCount ? ` · up to ${ep.maxRemaining} spots` : ''}`;
-		row.querySelector('.ep-badge').textContent = ep.openCount ? `${ep.openCount} open` : 'none';
+			`${ep.area ? ep.area + ' · ' : ''}ID ${ep.id}${ep.maxRemaining ? ` · max ${ep.maxRemaining}` : ''}`;
+		row.querySelector('.ep-badge').textContent = open.count ? `${open.count} open` : 'none';
 		row.querySelector('input').addEventListener('change', (e) => {
+			row.classList.toggle('checked', e.target.checked);
 			toggleWatch(ep.id, e.target.checked);
 		});
 		list.appendChild(row);
 	});
+}
+
+function qualifiedOpen(ep) {
+	const min = state.cfg.groupSize || 1;
+	const spots = ep.openSpots || (ep.openDates || []).map(() => ({ remaining: ep.maxRemaining }));
+	const qualifying = spots.filter((d) => d.remaining == null || d.remaining >= min);
+	return {
+		count: qualifying.length,
+		maxRemaining: qualifying.reduce((m, d) => Math.max(m, d.remaining ?? 0), 0)
+	};
 }
 
 function toggleWatch(id, on) {
@@ -153,7 +195,6 @@ function toggleWatch(id, on) {
 	on ? set.add(id) : set.delete(id);
 	state.cfg.watchlist = [...set];
 	persist();
-	updateMatchSummary();
 }
 
 function renderDates() {
@@ -181,27 +222,10 @@ function renderDates() {
 	});
 }
 
-function updateMatchSummary() {
-	const wl = state.cfg.watchlist;
-	const min = state.cfg.minAvailable || 1;
-	const pool = wl.length
-		? state.scan.entryPoints.filter((ep) => wl.includes(ep.id))
-		: state.scan.entryPoints;
-	const matched = pool.filter((ep) => ep.openCount && ep.maxRemaining >= min).length;
-	$('matchSummary').textContent = wl.length
-		? `${matched}/${wl.length} open`
-		: `${matched} open`;
-}
-
-function updateArmedDot() {
-	$('dot').classList.toggle('armed', !!state.cfg.autoGrab);
-}
-
 // ---- control wiring ----
 function wire() {
 	BOOLS.forEach((k) => $(k).addEventListener('change', () => {
 		state.cfg[k] = $(k).checked;
-		if (k === 'autoGrab') updateArmedDot();
 		persist();
 	}));
 
@@ -209,18 +233,11 @@ function wire() {
 	$('gsPlus').addEventListener('click', () => bumpGroup(1));
 	$('gsMinus').addEventListener('click', () => bumpGroup(-1));
 
-	$('minAvailable').addEventListener('change', () => {
-		state.cfg.minAvailable = Math.max(1, parseInt($('minAvailable').value, 10) || 1);
-		persist();
-		updateMatchSummary();
-	});
-
 	$('epSearch').addEventListener('input', (e) => renderEntryPoints(e.target.value));
 	$('selAll').addEventListener('click', () => bulkSelect('all'));
 	$('selNone').addEventListener('click', () => bulkSelect('none'));
 	$('selOpen').addEventListener('click', () => bulkSelect('open'));
 
-	$('applyGroup').addEventListener('click', applyGroupNow);
 	$('bPlus').addEventListener('click', () => bumpBanner(1));
 	$('bMinus').addEventListener('click', () => bumpBanner(-1));
 	$('loadBtn').addEventListener('click', loadAvailability);
@@ -234,6 +251,7 @@ function commitGroupSize() {
 	const n = parseInt($('groupSize').value, 10);
 	state.cfg.groupSize = Number.isFinite(n) && n > 0 ? n : null;
 	persist();
+	renderEntryPoints($('epSearch').value);
 }
 function bumpGroup(delta) {
 	const cur = parseInt($('groupSize').value, 10) || 0;
@@ -245,10 +263,9 @@ function bumpGroup(delta) {
 function bulkSelect(mode) {
 	if (mode === 'none') state.cfg.watchlist = [];
 	else if (mode === 'all') state.cfg.watchlist = state.scan.entryPoints.map((e) => e.id);
-	else if (mode === 'open') state.cfg.watchlist = state.scan.entryPoints.filter((e) => e.openCount).map((e) => e.id);
+	else if (mode === 'open') state.cfg.watchlist = state.scan.entryPoints.filter((e) => qualifiedOpen(e).count).map((e) => e.id);
 	persist();
 	renderEntryPoints($('epSearch').value);
-	updateMatchSummary();
 }
 
 // Opens the live guest popup, grabs its markup, and copies it to the clipboard
@@ -310,26 +327,6 @@ async function rescanUntilReady(tries = 8, delay = 700) {
 	return false;
 }
 
-async function applyGroupNow() {
-	if (!state.cfg.groupSize) { flashStatusOnBtn('Set a size first'); return; }
-	const btn = $('applyGroup');
-	const orig = btn.textContent;
-	btn.textContent = `Setting ${state.cfg.groupSize}…`;
-	try {
-		const res = await send('rg:applyGroupSize', { size: state.cfg.groupSize });
-		btn.textContent = res?.ok ? 'Done ✓' : 'Couldn\'t set';
-	} catch {
-		btn.textContent = 'Page not ready';
-	}
-	setTimeout(() => (btn.textContent = orig), 1400);
-}
-function flashStatusOnBtn(text) {
-	const btn = $('applyGroup');
-	const orig = btn.textContent;
-	btn.textContent = text;
-	setTimeout(() => (btn.textContent = orig), 1400);
-}
-
 async function clearConfig() {
 	const all = await getConfigs();
 	delete all[state.key];
@@ -337,7 +334,7 @@ async function clearConfig() {
 	state.cfg = { ...DEFAULTS, label: state.scan.label };
 	if (state.scan.currentGroupSize) state.cfg.groupSize = state.scan.currentGroupSize;
 	render();
-	flashSaved();
 }
 
+wireGlobals();
 init().then(wire);

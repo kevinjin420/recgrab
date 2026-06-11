@@ -14,8 +14,6 @@
 		enabled: true,
 		watchlist: [], // entry-point IDs (preferred) or name substrings
 		groupSize: null, // desired "Group Members" count; null = leave alone
-		autoSetGroupSize: true, // set group size on load so availability unlocks
-		minAvailable: 1, // a date cell counts as a match when remaining >= this
 		hideNonMatchingRows: true,
 		hideRowsWithNoMatch: false,
 		dimUnavailable: true,
@@ -205,6 +203,38 @@
 		} catch {}
 	}
 
+	// ---- Global flags (universal across all pages) ----
+	// `enabled` = master on/off for the whole extension.
+	// `armed`   = auto-grab is live. Stored as top-level sync keys so they can be
+	// toggled from any page's popup and every tab reacts instantly.
+	const GLOBAL_DEFAULTS = { enabled: true, armed: false };
+
+	async function getGlobals() {
+		if (!extAlive()) return { ...GLOBAL_DEFAULTS };
+		try {
+			const s = await chrome.storage.sync.get(['enabled', 'armed']);
+			return { enabled: s.enabled !== false, armed: !!s.armed };
+		} catch (e) {
+			if (/context invalidated/i.test(e?.message || '')) return { ...GLOBAL_DEFAULTS };
+			throw e;
+		}
+	}
+
+	async function setGlobals(patch) {
+		if (!extAlive()) return;
+		try { await chrome.storage.sync.set(patch); }
+		catch (e) { if (!/context invalidated/i.test(e?.message || '')) throw e; }
+	}
+
+	function onGlobalsChange(cb) {
+		if (!extAlive()) return;
+		try {
+			chrome.storage.onChanged.addListener((changes, area) => {
+				if (area === 'sync' && (changes.enabled || changes.armed)) cb();
+			});
+		} catch {}
+	}
+
 	const log = (...args) => {
 		console.debug('%c[RecGrab]', 'color:#466c04;font-weight:bold', ...args);
 		// Mirror to the on-page diagnostics panel (best-effort).
@@ -288,6 +318,7 @@
 				area: row.area,
 				openCount: open.length,
 				openDates: open.map((d) => d.iso),
+				openSpots: open.map((d) => ({ iso: d.iso, remaining: d.remaining })),
 				maxRemaining: open.reduce((m, d) => Math.max(m, d.remaining ?? 0), 0)
 			};
 		});
@@ -316,6 +347,7 @@
 		buildColumnDateMap, readRow, matchesWatchlist, setReactInputValue,
 		waitFor, sleep, log, isoFromDate, readGroupSize, isGuestPlaceholder,
 		getAllConfigs, getConfig, setConfig, deleteConfig, onConfigChange,
+		getGlobals, setGlobals, onGlobalsChange,
 		scanGrid, scanOptions, pageLabel, extAlive
 	};
 

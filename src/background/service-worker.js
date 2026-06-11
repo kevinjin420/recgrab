@@ -2,20 +2,25 @@
 // auto-grab state on the toolbar badge.
 
 chrome.runtime.onInstalled.addListener(async () => {
-	const { configs } = await chrome.storage.sync.get('configs');
-	if (!configs) await chrome.storage.sync.set({ configs: {} });
+	const cur = await chrome.storage.sync.get(['configs', 'enabled', 'armed']);
+	const seed = {};
+	if (!cur.configs) seed.configs = {};
+	if (cur.enabled === undefined) seed.enabled = true;
+	if (cur.armed === undefined) seed.armed = false;
+	if (Object.keys(seed).length) await chrome.storage.sync.set(seed);
 });
 
-// Badge shows ON (red) if any saved page config has auto-grab armed.
+// Badge shows ARMED (red) when the global armed flag is on and the extension is
+// enabled; otherwise blank.
 async function refreshBadge() {
-	const { configs } = await chrome.storage.sync.get('configs');
-	const armed = Object.values(configs || {}).some((c) => c?.enabled && c?.autoGrab);
-	await chrome.action.setBadgeText({ text: armed ? 'ON' : '' });
-	await chrome.action.setBadgeBackgroundColor({ color: armed ? '#b84a4a' : '#466c04' });
+	const { enabled, armed } = await chrome.storage.sync.get(['enabled', 'armed']);
+	const on = enabled !== false && !!armed;
+	await chrome.action.setBadgeText({ text: on ? 'ARM' : '' });
+	await chrome.action.setBadgeBackgroundColor({ color: '#b84a4a' });
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
-	if (area === 'sync' && changes.configs) refreshBadge();
+	if (area === 'sync' && (changes.enabled || changes.armed)) refreshBadge();
 });
 chrome.runtime.onStartup?.addListener(refreshBadge);
 refreshBadge();

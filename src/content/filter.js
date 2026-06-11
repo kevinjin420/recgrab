@@ -20,7 +20,7 @@
 	function isMatch(dateCell, config) {
 		if (dateCell.state !== 'available') return false;
 		if (dateCell.remaining == null) return true; // available but no count parsed
-		return dateCell.remaining >= (config.minAvailable || 1);
+		return dateCell.remaining >= (config.groupSize || 1);
 	}
 
 	function apply(config) {
