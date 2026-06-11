@@ -1,0 +1,77 @@
+/* Grid decorations (palette mirrors recreation.gov "sarsaparilla") */
+.rg-hidden-row { display: none !important; }
+
+.rg-dim-cell { opacity: 0.3 !important; filter: grayscale(0.5); }
+
+.rg-match-cell {
+	outline: 2px solid #466c04 !important;
+	outline-offset: -2px;
+	border-radius: 4px;
+	animation: rg-pulse 1.6s ease-in-out infinite;
+}
+.rg-match-cell button { font-weight: 700 !important; }
+
+.rg-match-row { background: #eff6e8 !important; }
+
+@keyframes rg-pulse {
+	0%, 100% { outline-color: #466c04; }
+	50% { outline-color: #8bbf3f; }
+}
+
+/* Floating status panel */
+.rg-panel {
+	position: fixed;
+	right: 16px;
+	bottom: 16px;
+	z-index: 2147483646;
+	width: 220px;
+	background: #fff;
+	color: #1a1e23;
+	border: 1px solid #dee0e3;
+	border-radius: 8px;
+	box-shadow: 0 8px 28px rgba(26, 30, 35, 0.18);
+	font: 13px/1.4 "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	overflow: hidden;
+}
+.rg-panel * { box-sizing: border-box; }
+
+.rg-panel-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	background: #345d96;
+	color: #fff;
+}
+.rg-panel-head .rg-dot {
+	width: 9px; height: 9px; border-radius: 50%;
+	background: #8bbf3f; box-shadow: 0 0 6px #8bbf3f;
+}
+.rg-panel-head .rg-dot.rg-dot-armed {
+	background: #b84a4a; box-shadow: 0 0 6px #b84a4a;
+	animation: rg-blink 1s steps(2, start) infinite;
+}
+@keyframes rg-blink { 50% { opacity: 0.35; } }
+.rg-panel-head strong { flex: 1; letter-spacing: 0.3px; }
+.rg-min {
+	background: transparent; border: 0; color: #fff;
+	font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px;
+}
+
+.rg-status {
+	padding: 6px 10px;
+	background: #eff6e8;
+	border-bottom: 1px solid #dee0e3;
+	font-size: 12px;
+	color: #4f762a;
+	font-weight: 600;
+}
+
+.rg-panel-body { padding: 10px; display: grid; gap: 8px; }
+.rg-collapsed .rg-panel-body, .rg-collapsed .rg-status { display: none; }
+
+.rg-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.rg-toggle input { width: 16px; height: 16px; accent-color: #466c04; }
+.rg-toggle.rg-danger span { color: #b84a4a; font-weight: 600; }
+.rg-toggle.rg-danger input { accent-color: #b84a4a; }
+.rg-hint { margin: 2px 0 0; font-size: 11px; color: #6a7381; line-height: 1.35; }

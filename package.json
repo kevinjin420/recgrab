@@ -1,0 +1,10 @@
+{
+	"name": "recgrab-extension",
+	"version": "0.1.0",
+	"description": "Filter Recreation.gov detailed-availability grids, auto-set group size, and assist clicking open dates.",
+	"private": true,
+	"scripts": {
+		"build": "rm -rf dist && mkdir -p dist/src && cp -r public/* dist/ && cp -r src/* dist/src/ && bun -e \"const m=require('./dist/manifest.json');const p=require('./package.json');m.version=p.version;require('fs').writeFileSync('./dist/manifest.json',JSON.stringify(m,null,'\\t')+'\\n')\"",
+		"release": "npm run build && rm -f ext.zip && cd dist && zip -r ../ext.zip ."
+	}
+}

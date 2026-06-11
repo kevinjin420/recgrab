@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<link rel="stylesheet" href="popup.css" />
+	<title>RecGrab</title>
+</head>
+<body>
+	<header class="hdr">
+		<span class="dot" id="dot"></span>
+		<div class="hdr-text">
+			<h1>RecGrab</h1>
+			<p id="pageLabel" class="hdr-sub">Recreation.gov helper</p>
+		</div>
+		<span id="savedBadge" class="saved-badge" hidden>Saved</span>
+	</header>
+
+	<!-- Empty / loading states -->
+	<section id="stateMsg" class="state">
+		<p id="stateText">Checking this page…</p>
+		<button id="retryBtn" class="btn btn-secondary" hidden>Scan page</button>
+	</section>
+
+	<!-- Configurator (hidden until a scan succeeds) -->
+	<main id="config" hidden>
+		<section class="block">
+			<div class="row-between">
+				<label class="switch">
+					<input type="checkbox" id="enabled" />
+					<span>Enable on this page</span>
+				</label>
+				<span id="matchSummary" class="pill pill-green">—</span>
+			</div>
+		</section>
+
+		<section class="block">
+			<div class="block-head">
+				<h2>Entry points</h2>
+				<div class="mini-actions">
+					<button id="selAll" class="link">All</button>
+					<button id="selNone" class="link">None</button>
+					<button id="selOpen" class="link">Open only</button>
+				</div>
+			</div>
+			<input type="search" id="epSearch" class="search" placeholder="Filter entry points…" />
+			<div id="epList" class="ep-list" role="group" aria-label="Entry points"></div>
+		</section>
+
+		<section class="block">
+			<div class="block-head"><h2>Group size</h2></div>
+			<div class="row-inline">
+				<div class="stepper" role="group" aria-label="Group size">
+					<button id="gsMinus" type="button" aria-label="Decrease">−</button>
+					<input type="number" id="groupSize" min="1" inputmode="numeric" />
+					<button id="gsPlus" type="button" aria-label="Increase">+</button>
+				</div>
+				<button id="applyGroup" class="btn btn-secondary">Set on page</button>
+			</div>
+			<label class="switch sm">
+				<input type="checkbox" id="autoSetGroupSize" />
+				<span>Auto-set group size when the page loads</span>
+			</label>
+		</section>
+
+		<section class="block">
+			<div class="block-head"><h2>Highlighting</h2></div>
+			<label class="switch sm"><input type="checkbox" id="highlightMatches" /><span>Highlight open matches</span></label>
+			<label class="switch sm"><input type="checkbox" id="hideNonMatchingRows" /><span>Hide unselected rows</span></label>
+			<label class="switch sm"><input type="checkbox" id="hideRowsWithNoMatch" /><span>Hide selected rows with nothing open</span></label>
+			<label class="switch sm"><input type="checkbox" id="dimUnavailable" /><span>Dim unavailable / not-released</span></label>
+			<label class="field-inline">
+				<span>Min open spots to count as a match</span>
+				<input type="number" id="minAvailable" min="1" class="num-sm" />
+			</label>
+		</section>
+
+		<section class="block block-grab">
+			<div class="block-head"><h2>Auto-grab</h2></div>
+			<p class="muted">Pick the dates RecGrab may click for your selected entry points.</p>
+			<div id="dateList" class="date-list" role="group" aria-label="Target dates"></div>
+			<label class="switch sm danger">
+				<input type="checkbox" id="autoGrab" />
+				<span>Arm auto-grab</span>
+			</label>
+			<p class="warn">Auto-grab only <strong>opens</strong> a date, then stops. It never completes checkout, payment, or captcha. Use within Recreation.gov's Terms of Service.</p>
+		</section>
+	</main>
+
+	<footer id="footer" class="footer" hidden>
+		<button id="clearBtn" class="link danger-link">Delete saved config</button>
+		<button id="saveBtn" class="btn btn-primary">Done</button>
+	</footer>
+
+	<script src="popup.js"></script>
+</body>
+</html>
