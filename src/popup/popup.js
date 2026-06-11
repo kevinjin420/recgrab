@@ -1,5 +1,5 @@
 // Toolbar popup: scans the active recreation.gov availability page, lets the
-// user pick entry points / group size / target dates, and auto-saves the config
+// user pick entry points / group size / target date, and auto-saves the config
 // keyed by permit/campground ID. The content script reacts to storage changes
 // and applies filtering/highlighting live.
 
@@ -7,7 +7,7 @@ const DEFAULTS = {
 	label: '', watchlist: [], groupSize: null,
 	hideNonMatchingRows: true, hideRowsWithNoMatch: false,
 	dimUnavailable: true, highlightMatches: true,
-	targetDates: [], autoGrabIntervalMs: 3000, updatedAt: 0
+	targetDate: '', autoGrabIntervalMs: 3000, updatedAt: 0
 };
 
 const BOOLS = ['highlightMatches', 'hideNonMatchingRows', 'hideRowsWithNoMatch', 'dimUnavailable'];
@@ -24,7 +24,7 @@ async function getConfigs() {
 function normalizeConfig(raw = {}) {
 	const cfg = { ...DEFAULTS };
 	for (const k of ['label', 'watchlist', 'groupSize', 'hideNonMatchingRows',
-			'hideRowsWithNoMatch', 'dimUnavailable', 'highlightMatches', 'targetDates',
+			'hideRowsWithNoMatch', 'dimUnavailable', 'highlightMatches', 'targetDate',
 			'autoGrabIntervalMs', 'updatedAt']) {
 		if (raw[k] !== undefined) cfg[k] = raw[k];
 	}
@@ -142,7 +142,6 @@ function render() {
 	if (needs) $('bGroupSize').value = state.cfg.groupSize ?? state.scan.currentGroupSize ?? 2;
 
 	renderEntryPoints();
-	renderDates();
 	renderCalendar();
 }
 
@@ -202,33 +201,6 @@ function toggleWatch(id, on) {
 	persist();
 }
 
-function renderDates() {
-	const wrap = $('dateList');
-	wrap.innerHTML = '';
-	const targets = [...new Set(state.cfg.targetDates || [])].sort();
-	if (!targets.length) {
-		wrap.innerHTML = '<span class="date-list-empty">No target dates yet.</span>';
-		return;
-	}
-	targets.forEach((iso) => {
-		const d = targetDateParts(iso);
-		const chip = document.createElement('button');
-		chip.type = 'button';
-		chip.className = 'date-chip target-date-chip checked';
-		chip.title = `Remove ${d.label}`;
-		chip.innerHTML = `<span class="dow"></span><span class="dnum"></span><span class="remove">×</span>`;
-		chip.querySelector('.dow').textContent = d.weekday;
-		chip.querySelector('.dnum').textContent = d.short;
-		chip.addEventListener('click', () => {
-			state.cfg.targetDates = (state.cfg.targetDates || []).filter((x) => x !== iso);
-			persist();
-			renderDates();
-			renderCalendar();
-		});
-		wrap.appendChild(chip);
-	});
-}
-
 function targetDateParts(iso) {
 	const d = new Date(iso + 'T00:00:00');
 	return {
@@ -250,7 +222,7 @@ function isoFromLocalDate(d) {
 }
 
 function selectedDateLabel() {
-	const iso = $('targetDateInput').value;
+	const iso = state.cfg.targetDate;
 	return iso ? targetDateParts(iso).label : 'Pick a date';
 }
 
@@ -264,8 +236,7 @@ function renderCalendar() {
 	const month = calendarMonth.getMonth();
 	const year = calendarMonth.getFullYear();
 	const daysInMonth = new Date(year, month + 1, 0).getDate();
-	const selected = $('targetDateInput').value;
-	const saved = new Set(state.cfg.targetDates || []);
+	const selected = state.cfg.targetDate;
 
 	for (let i = 0; i < startOffset; i++) grid.appendChild(blankDay());
 	for (let day = 1; day <= daysInMonth; day++) {
@@ -278,12 +249,9 @@ function renderCalendar() {
 		btn.setAttribute('role', 'gridcell');
 		btn.setAttribute('aria-label', targetDateParts(iso).label);
 		btn.classList.toggle('selected', iso === selected);
-		btn.classList.toggle('saved', saved.has(iso));
-		btn.addEventListener('click', () => {
-			$('targetDateInput').value = iso;
-			$('dateTriggerText').textContent = targetDateParts(iso).label;
+		btn.addEventListener('click', async () => {
+			await setTargetDate(iso);
 			closeCalendar();
-			renderCalendar();
 		});
 		grid.appendChild(btn);
 	}
@@ -335,7 +303,6 @@ function wire() {
 	$('selAll').addEventListener('click', () => bulkSelect('all'));
 	$('selNone').addEventListener('click', () => bulkSelect('none'));
 	$('selOpen').addEventListener('click', () => bulkSelect('open'));
-	$('addDateBtn').addEventListener('click', addTargetDateFromInput);
 	$('dateTrigger').addEventListener('click', toggleCalendar);
 	$('calPrev').addEventListener('click', () => moveCalendarMonth(-1));
 	$('calNext').addEventListener('click', () => moveCalendarMonth(1));
@@ -347,7 +314,7 @@ function wire() {
 	$('dumpLink').addEventListener('click', copyDiagnostics);
 	$('retryBtn').addEventListener('click', init);
 	$('saveBtn').addEventListener('click', async () => { await persistNow(); window.close(); });
-	$('clearBtn').addEventListener('click', clearConfig);
+	$('clearBtn').addEventListener('click', clearAllSettings);
 }
 
 function commitGroupSize() {
@@ -371,24 +338,13 @@ function bulkSelect(mode) {
 	renderEntryPoints($('epSearch').value);
 }
 
-function addTargetDate(iso) {
+async function setTargetDate(iso) {
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return false;
-	const set = new Set(state.cfg.targetDates || []);
-	set.add(iso);
-	state.cfg.targetDates = [...set].sort();
-	persist();
-	renderDates();
+	state.cfg.targetDate = iso;
+	await persistNow();
 	renderCalendar();
+	try { await send('rg:navigateDate', { iso }); } catch {}
 	return true;
-}
-
-function addTargetDateFromInput() {
-	const input = $('targetDateInput');
-	if (addTargetDate(input.value)) {
-		input.value = '';
-		$('dateTriggerText').textContent = 'Pick a date';
-		renderCalendar();
-	}
 }
 
 // Opens the live guest popup, grabs its markup, and copies it to the clipboard
@@ -450,10 +406,10 @@ async function rescanUntilReady(tries = 8, delay = 700) {
 	return false;
 }
 
-async function clearConfig() {
-	const all = await getConfigs();
-	delete all[state.key];
-	await chrome.storage.sync.set({ configs: all });
+async function clearAllSettings() {
+	if (!confirm('Clear all RecGrab settings for every page?')) return;
+	await chrome.storage.sync.clear();
+	applyGlobalsUI(await getGlobals());
 	state.cfg = { ...DEFAULTS, label: state.scan.label };
 	if (state.scan.currentGroupSize) state.cfg.groupSize = state.scan.currentGroupSize;
 	render();

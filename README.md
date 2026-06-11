@@ -18,9 +18,9 @@ recreation.gov's own palette and Open Sans typography.
 
 1. Navigate to a permit/campground **Detailed Availability** page.
 2. Click the **RecGrab** toolbar icon. The popup **scans the page** and lists the
-   real entry points (with live open-spot counts) and the visible date columns.
+   real entry points with live open-spot counts.
 3. Pick the entry points to watch, set your group size, choose highlight options,
-   and (optionally) select target dates.
+   and select the target date.
 4. Per-page settings **auto-save to `chrome.storage.sync`, keyed by the permit/
    campground ID** (e.g. `permits:445859`) — stable across visits even though the
    URL's `?date=&type=` params change.
@@ -30,7 +30,7 @@ recreation.gov's own palette and Open Sans typography.
    grayed out while the extension is **Off**, and turning **Off** also disarms.
 6. Next time you open a saved page, the config loads automatically and the content
    script applies your filtering/highlighting (and group size). If globally
-   **Armed**, any saved page with target entry points/dates auto-grabs.
+   **Armed**, any saved page with target entry points and a target date auto-grabs.
 
 ### First-visit "unset" state
 
@@ -101,7 +101,7 @@ src/
                 config storage, React input helper, waitFor/sleep utils
     filter.js   RG.filter — hide/dim/highlight rows & date cells
     autofill.js RG.autofill — open the guest counter and converge to group size
-    autograb.js RG.autograb — poll grid, click first open target-date cell, stop
+    autograb.js RG.autograb — navigate to the target date, click the first matching open cell, then Book Now
     panel.js    RG.panel — floating in-page control panel
     main.js     orchestrator: config + MutationObserver + SPA-nav handling
     content.css decorations (hide/dim/highlight) + panel styles
@@ -139,7 +139,7 @@ to ISO dates by parsing the header row's screen-reader date labels
 | Hide unselected rows | Collapse rows not in your selection |
 | Hide selected rows with nothing open | Hide watched rows with no open date in view |
 | Dim unavailable / not-released | De-emphasize cells you can't book |
-| Target dates | Arbitrary dates you add; RecGrab navigates the availability page to those date windows before scanning/clicking |
+| Target date | The single date RecGrab navigates to before scanning/clicking |
 | On (global) | Master on/off for the whole extension; toggling off disarms |
 | Armed (global) | Auto-grab is live on every saved page; clicks the date cell then **Book Now**, stays armed until turned off |
 

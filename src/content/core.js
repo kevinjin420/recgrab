@@ -19,7 +19,7 @@
 		dimUnavailable: true,
 		highlightMatches: true,
 		autoGrab: false,
-		targetDates: [], // ISO dates auto-grab may click, e.g. ["2026-06-13"]
+		targetDate: '', // ISO date auto-grab may click, e.g. "2026-06-13"
 		autoGrabIntervalMs: 4000,
 		updatedAt: 0
 	};
@@ -169,7 +169,8 @@
 
 	async function getConfig(key = contextKey()) {
 		const all = await getAllConfigs();
-		return { ...DEFAULT_CONFIG, ...(key ? all[key] : null) };
+		const saved = key ? all[key] : null;
+		return { ...DEFAULT_CONFIG, ...(saved || {}) };
 	}
 
 	async function setConfig(patch, key = contextKey()) {

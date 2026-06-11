@@ -63,20 +63,17 @@
 		return null;
 	}
 
-	// Open the dropdown, verifying via aria-expanded / popup presence and
-	// retrying rather than blindly toggling.
+	// Open the dropdown once, verifying via aria-expanded / popup presence.
 	async function openPopup() {
 		const trigger = document.querySelector(RG.SEL.guestTrigger);
 		if (!trigger) return { trigger: null, popup: null };
-		for (let attempt = 0; attempt < 3; attempt++) {
-			if (trigger.getAttribute('aria-expanded') === 'true' || findOpenPopup()) {
-				const p = await waitForPopup(1200);
-				if (p) return { trigger, popup: p };
-			}
-			press(trigger);
+		if (trigger.getAttribute('aria-expanded') === 'true' || findOpenPopup()) {
 			const p = await waitForPopup(1200);
 			if (p) return { trigger, popup: p };
 		}
+		press(trigger);
+		const p = await waitForPopup(1200);
+		if (p) return { trigger, popup: p };
 		return { trigger, popup: findOpenPopup() };
 	}
 

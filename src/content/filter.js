@@ -19,8 +19,7 @@
 	// Decide whether a date cell is a "match" the user would want to click.
 	function isMatch(dateCell, config) {
 		if (dateCell.state !== 'available') return false;
-		const targets = (config.targetDates || []).filter(Boolean);
-		if (targets.length && !targets.includes(dateCell.iso)) return false;
+		if (config.targetDate && dateCell.iso !== config.targetDate) return false;
 		if (dateCell.remaining == null) return true; // available but no count parsed
 		return dateCell.remaining >= (config.groupSize || 1);
 	}

@@ -15,7 +15,7 @@
 	function panelState() { return { enabled: globals.enabled, armed: globals.armed }; }
 	function hasTargets() {
 		return !!((config.watchlist && config.watchlist.length) &&
-			(config.targetDates && config.targetDates.length));
+			config.targetDate);
 	}
 
 	// Start/stop auto-grab based on the global flags + whether this page has
@@ -58,6 +58,9 @@
 			case 'rg:dumpPopup':
 				RG.autofill.dumpPopup().then((html) => sendResponse({ html }));
 				return true; // async
+			case 'rg:navigateDate':
+				sendResponse({ ok: true, navigated: RG.autograb.navigateToDate(msg.iso) });
+				return;
 			case 'rg:reapply':
 				RG.getConfig().then((c) => { config = c; rerun(); sendResponse({ ok: true }); });
 				return true;

@@ -93,7 +93,7 @@
 		const g = await RG.getGlobals();
 		const range = RG.autograb.currentGridDateRange();
 		logLine(`globals: on=${g.enabled} armed=${g.armed}`);
-		logLine(`config: group=${cfg.groupSize} watch=[${(cfg.watchlist || []).join(',')}] dates=[${(cfg.targetDates || []).join(',')}]`);
+		logLine(`config: group=${cfg.groupSize} watch=[${(cfg.watchlist || []).join(',')}] date=${cfg.targetDate || '(none)'}`);
 		logLine(`visible dates: ${range.start || '?'} → ${range.end || '?'} (${range.dates.length} columns)`);
 		logLine(`page date: ${RG.autograb.currentPageDate() || '(none)'}`);
 		const t = RG.autograb.findGrabTarget(cfg);

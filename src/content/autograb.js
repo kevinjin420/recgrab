@@ -46,14 +46,11 @@
 			|| all[0] || null;
 	}
 
-	// Activate the button as robustly as possible: scroll it into view (usePress
-	// rejects clicks whose clientX/Y aren't over the target), fire the react-aria
-	// pointer sequence, AND a native .click() (covers plain React onClick).
+	// Activate the button once with coordinates that react-aria's usePress accepts.
 	function pressBtn(btn) {
 		try { btn.scrollIntoView({ block: 'center', inline: 'center' }); } catch {}
 		try { btn.focus({ preventScroll: true }); } catch {}
 		if (RG.autofill && RG.autofill.press) RG.autofill.press(btn);
-		try { btn.click(); } catch {}
 	}
 
 	function visibleDates() {
@@ -117,112 +114,45 @@
 		return null;
 	}
 
-	// After a date cell is selected, wait for "Book Now" to enable, then click it.
-	// Confirms the click "took" by checking the button leaves the enabled state
-	// (selection consumed / navigation) and retries the press a couple times.
+	// After a date cell is selected, wait for "Book Now" to enable, then click it once.
 	async function clickBookNow({ timeout = 8000 } = {}) {
 		const btn = await waitForEnabledBookNow(timeout);
 		if (!btn) {
 			RG.log('"Book Now" never enabled within', timeout, 'ms — selection may not have registered');
 			return false;
 		}
-		for (let attempt = 1; attempt <= 3; attempt++) {
-			RG.log(`clicking "Book Now" (attempt ${attempt})`);
-			pressBtn(btn);
-			await RG.sleep(450);
-			// If the page navigated away or the button is gone/disabled, treat as success.
-			if (!document.contains(btn) || !isEnabled(findBookNow() || btn)) {
-				RG.log('"Book Now" click registered');
-				return true;
-			}
+		RG.log('clicking "Book Now"');
+		pressBtn(btn);
+		await RG.sleep(450);
+		// If the page navigated away or the button is gone/disabled, treat as success.
+		if (!document.contains(btn) || !isEnabled(findBookNow() || btn)) {
+			RG.log('"Book Now" click registered');
+			return true;
 		}
-		RG.log('"Book Now" press did not take after retries');
+		RG.log('"Book Now" press did not appear to take');
 		return false;
 	}
 
 	// Press a date cell, then confirm selection by waiting for Book Now to enable.
-	async function selectDateCell(btnEl, { tries = 3 } = {}) {
-		for (let attempt = 1; attempt <= tries; attempt++) {
-			if (!btnEl || !document.contains(btnEl)) return false;
-			RG.log(`selecting date cell (attempt ${attempt})`);
-			pressBtn(btnEl);
-			const enabled = await waitForEnabledBookNow(2500);
-			if (enabled) return true;
-			RG.log('selection did not register; retrying');
-			await RG.sleep(350);
-		}
-		return false;
+	async function selectDateCell(btnEl) {
+		if (!btnEl || !document.contains(btnEl)) return false;
+		RG.log('selecting date cell');
+		pressBtn(btnEl);
+		return !!(await waitForEnabledBookNow(2500));
 	}
 
-	function targetDates(config) {
-		return [...new Set(config.targetDates || [])].filter(Boolean).sort();
-	}
-
-	const NAV_KEY = () => `rg-nav:${RG.contextKey() || location.pathname}`;
-	const NAV_COOLDOWN_MS = 45000;
-
-	function readNavState() {
-		try {
-			return JSON.parse(sessionStorage.getItem(NAV_KEY()) || '{}');
-		} catch {
-			return {};
-		}
-	}
-
-	function writeNavState(state) {
-		try { sessionStorage.setItem(NAV_KEY(), JSON.stringify(state)); } catch {}
-	}
-
-	const targetSignature = (targets) => targets.join('|');
-
-	function navStateFor(targets) {
-		const sig = targetSignature(targets);
-		const state = readNavState();
-		if (state.sig !== sig) return { sig, checked: [], cooldownUntil: 0 };
-		return state;
-	}
-
-	function markChecked(dates, targets) {
-		const state = navStateFor(targets);
-		const checked = new Set(state.checked || []);
-		dates.forEach((d) => checked.add(d));
-		writeNavState({ ...state, checked: [...checked] });
-	}
-
-	function clearChecked() {
-		writeNavState({ checked: [], cooldownUntil: 0 });
-	}
-
-	function nextNavigationDate(targets) {
-		const state = navStateFor(targets);
-		if (state.cooldownUntil && Date.now() < state.cooldownUntil) {
-			RG.log('date navigation cooldown active');
-			return null;
-		}
-		const checked = new Set(state.checked || []);
-		const unchecked = targets.filter((d) => !checked.has(d));
-		if (!unchecked.length) {
-			RG.log('checked all target date windows; cooling down');
-			writeNavState({ ...state, checked: [], cooldownUntil: Date.now() + NAV_COOLDOWN_MS });
-			return null;
-		}
-		const range = currentGridDateRange();
-		if (!range.start || !range.end) return unchecked[0] || null;
-		return unchecked.find((d) => d > range.end)
-			|| unchecked.find((d) => d < range.start)
-			|| unchecked[0] || null;
-	}
+	const targetDate = (config) => config.targetDate || '';
 
 	// Find the best matching open cell across watched rows for one visible target date.
 	function findGrabTarget(config, targetIso = null) {
 		const scan = RG.scanGrid();
 		if (!scan) return null;
-		const targets = targetIso ? [targetIso] : targetDates(config).filter((d) => scan.colDates.includes(d));
+		const target = targetIso || targetDate(config);
 
 		for (const row of scan.rows) {
 			if (!RG.matchesWatchlist(row, config.watchlist)) continue;
 			for (const d of row.dates) {
-				if (targets.length && !targets.includes(d.iso)) continue;
+				if (target && d.iso !== target) continue;
 				if (RG.filter.isMatch(d, config) && d.btnEl && !d.btnEl.disabled) {
 					return { row, date: d, key: `${row.id}|${d.iso}` };
 				}
@@ -233,8 +163,7 @@
 
 	let booking = false; // re-entrancy guard while a grab is in flight
 
-	const hasTargets = (c) => !!((c.watchlist && c.watchlist.length) &&
-		(c.targetDates && c.targetDates.length));
+	const hasTargets = (c) => !!((c.watchlist && c.watchlist.length) && targetDate(c));
 
 	// NOTE: arming is governed globally (main.js starts/stops us on the global
 	// `enabled`+`armed` flags), so we don't check per-page enable here. We only
@@ -247,66 +176,39 @@
 			await RG.autofill.setGroupSize(config.groupSize);
 		}
 
-		const targets = targetDates(config);
-		const visibleTargets = targets.filter(isDateVisible);
-		if (!visibleTargets.length) {
-			const next = nextNavigationDate(targets);
-			if (next) {
-				if (currentPageDate() === next) {
-					const visible = await waitForDateVisible(next, 2500);
-					if (visible) return tick(config);
-					RG.log('target page date did not become visible; trying next target', next);
-					markChecked([next], targets);
-					const alt = nextNavigationDate(targets);
-					if (alt && alt !== next) navigateToDate(alt);
-				} else {
-					navigateToDate(next);
-				}
+		const targetIso = targetDate(config);
+		if (!isDateVisible(targetIso)) {
+			if (currentPageDate() === targetIso) {
+				const visible = await waitForDateVisible(targetIso, 2500);
+				if (visible) return tick(config);
+				RG.log('waiting for target date window', targetIso);
+			} else {
+				navigateToDate(targetIso);
 			}
 			return;
 		}
 
-		let target = null;
-		for (const iso of visibleTargets) {
-			target = findGrabTarget(config, iso);
-			if (target) break;
-		}
+		const target = findGrabTarget(config, targetIso);
 		if (!target) {
-			markChecked(visibleTargets, targets);
-			const next = nextNavigationDate(targets);
-			if (next) navigateToDate(next);
 			return;
 		}
-		if (!target) return;
 		if (target.key === lastClickKey) return; // don't spam the same cell
 
-		lastClickKey = target.key; // assume this cell is taken; reset on failure
+		lastClickKey = target.key; // do not click the same cell again unless targeting changes
 		booking = true;
 		RG.log('auto-grab target', target.key, `${target.date.remaining} spots — booking`);
 
-		let booked = false;
-		// Whole sequence retries: re-resolve fresh elements each attempt so a grid
-		// re-render between selecting and booking can't strand us on a stale node.
-		for (let attempt = 1; attempt <= 3 && !booked; attempt++) {
-			const fresh = findGrabTarget(config, target.date.iso) || target;
-			const selected = await selectDateCell(fresh.date.btnEl);
-			if (!selected) {
-				RG.log(`grab attempt ${attempt}: selection never registered`);
-				await RG.sleep(400);
-				continue;
-			}
-			booked = await clickBookNow();
-			if (!booked) { RG.log(`grab attempt ${attempt}: Book Now failed`); await RG.sleep(500); }
+		const selected = await selectDateCell(target.date.btnEl);
+		const booked = selected && await clickBookNow();
+		if (!selected) {
+			RG.log('date selection did not register');
 		}
 
 		// Stay armed: auto-grab keeps watching until the user turns it off.
-		// On failure, clear the guard so the next tick retries this same cell.
-		if (booked) clearChecked();
-		if (!booked) lastClickKey = null;
 		booking = false;
 		notify(booked
 			? `RecGrab grabbed ${target.row.name} on ${target.date.iso} — Book Now clicked. Finish checkout to confirm. (Auto-grab still on.)`
-			: `RecGrab saw ${target.row.name} on ${target.date.iso} but couldn't lock it in — retrying.`);
+			: `RecGrab saw ${target.row.name} on ${target.date.iso} but couldn't lock it in.`);
 	}
 
 	function notify(msg) {

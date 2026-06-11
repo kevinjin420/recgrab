@@ -78,15 +78,14 @@
 		</section>
 
 		<section class="block block-grab">
-			<div class="block-head"><h2>Auto-grab dates</h2></div>
-			<p class="muted">Add the exact dates RecGrab may click for your selected entry points. Flip <strong>Armed</strong> in the header to go live (global — works on every saved page).</p>
+			<div class="block-head"><h2>Auto-grab date</h2></div>
+			<p class="muted">Pick the exact date RecGrab should watch for your selected entry points. Flip <strong>Armed</strong> in the header to go live (global — works on every saved page).</p>
 			<div class="date-add-row">
 				<div class="calendar-wrap" id="calendarWrap">
 					<button id="dateTrigger" class="date-trigger" type="button" aria-expanded="false" aria-controls="calendarPanel">
 						<span id="dateTriggerText">Pick a date</span>
 						<span class="date-trigger-icon">▾</span>
 					</button>
-					<input type="hidden" id="targetDateInput" />
 					<div id="calendarPanel" class="calendar-panel" hidden>
 						<div class="calendar-head">
 							<button id="calPrev" class="calendar-nav" type="button" aria-label="Previous month">‹</button>
@@ -99,15 +98,13 @@
 						<div id="calGrid" class="calendar-grid" role="grid" aria-label="Choose target date"></div>
 					</div>
 				</div>
-				<button id="addDateBtn" class="btn btn-secondary" type="button">Add date</button>
 			</div>
-			<div id="dateList" class="date-list" role="group" aria-label="Target dates"></div>
 			<p class="warn">When armed, RecGrab selects a matching date and clicks <strong>Book Now</strong> to lock the slot, and <strong>stays armed</strong> until you turn it off here or from any page. It never completes checkout, payment, or captcha. Use within Recreation.gov's Terms of Service.</p>
 		</section>
 	</main>
 
 	<footer id="footer" class="footer" hidden>
-		<button id="clearBtn" class="link danger-link">Delete saved config</button>
+		<button id="clearBtn" class="link danger-link">Clear all settings</button>
 		<button id="saveBtn" class="btn btn-primary">Done</button>
 	</footer>
 
