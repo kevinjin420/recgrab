@@ -73,16 +73,31 @@
 		return new URL(location.href).searchParams.get('date');
 	}
 
+	function addDays(iso, delta) {
+		const [year, month, day] = iso.split('-').map(Number);
+		const d = new Date(year, month - 1, day);
+		d.setDate(d.getDate() + delta);
+		const yyyy = d.getFullYear();
+		const mm = String(d.getMonth() + 1).padStart(2, '0');
+		const dd = String(d.getDate()).padStart(2, '0');
+		return `${yyyy}-${mm}-${dd}`;
+	}
+
+	function pageDateForTarget(iso) {
+		return addDays(iso, -4);
+	}
+
 	function navigateToDate(iso) {
 		if (isDateVisible(iso)) return false;
-		if (currentPageDate() === iso) {
-			RG.log('date navigation pending; already on page date', iso);
+		const pageIso = pageDateForTarget(iso);
+		if (currentPageDate() === pageIso) {
+			RG.log('date navigation pending; already on page date', pageIso, 'for target', iso);
 			return false;
 		}
 		const url = new URL(location.href);
-		url.searchParams.set('date', iso);
+		url.searchParams.set('date', pageIso);
 		if (url.toString() === location.href) return false;
-		RG.log('navigating availability date', currentPageDate(), '->', iso);
+		RG.log('navigating availability date', currentPageDate(), '->', pageIso, 'for target', iso);
 		location.assign(url.toString());
 		return true;
 	}
@@ -178,7 +193,7 @@
 
 		const targetIso = targetDate(config);
 		if (!isDateVisible(targetIso)) {
-			if (currentPageDate() === targetIso) {
+			if (currentPageDate() === pageDateForTarget(targetIso)) {
 				const visible = await waitForDateVisible(targetIso, 2500);
 				if (visible) return tick(config);
 				RG.log('waiting for target date window', targetIso);
@@ -241,6 +256,7 @@
 		clickBookNow, selectDateCell, waitForEnabledBookNow, pressBtn,
 		visibleDates, currentGridDateRange, isDateVisible, currentPageDate,
 		navigateToDate, waitForDateVisible,
+		pageDateForTarget,
 		resetClickGuard: () => (lastClickKey = null)
 	};
 })();

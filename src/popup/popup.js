@@ -5,11 +5,11 @@
 
 const DEFAULTS = {
 	label: '', watchlist: [], groupSize: null,
-	hideNonMatchingRows: true,
+	hideNonMatchingRows: true, flexibleDates: false,
 	targetDate: '', autoGrabIntervalMs: 3000, updatedAt: 0
 };
 
-const BOOLS = ['hideNonMatchingRows'];
+const BOOLS = ['hideNonMatchingRows', 'flexibleDates'];
 
 const $ = (id) => document.getElementById(id);
 
@@ -22,7 +22,7 @@ async function getConfigs() {
 }
 function normalizeConfig(raw = {}) {
 	const cfg = { ...DEFAULTS };
-	for (const k of ['label', 'watchlist', 'groupSize', 'hideNonMatchingRows', 'targetDate',
+	for (const k of ['label', 'watchlist', 'groupSize', 'hideNonMatchingRows', 'flexibleDates', 'targetDate',
 			'autoGrabIntervalMs', 'updatedAt']) {
 		if (raw[k] !== undefined) cfg[k] = raw[k];
 	}

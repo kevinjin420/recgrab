@@ -137,7 +137,8 @@ to ISO dates by parsing the header row's screen-reader date labels
 | Group size | Number of people; stepper or type. Saved group sizes are always applied automatically when the page loads |
 | Target date | The single date RecGrab navigates to before scanning/clicking |
 | Hide unselected entry points | Collapse rows not in your selection |
-| Automatic highlighting | Watched, bookable target cells are green; non-actionable cells are muted; available cells with too few spots are subtly amber |
+| Flexible dates | Also mark other watched, bookable dates in the visible window as blue alternatives; auto-grab still uses the exact target date |
+| Automatic highlighting | Watched, bookable target cells are green; flexible alternatives are blue; non-actionable cells are muted; available cells with too few spots are subtly amber |
 | On (global) | Master on/off for the whole extension; toggling off disarms |
 | Armed (global) | Auto-grab is live on every saved page; clicks the date cell then **Book Now**, stays armed until turned off |
 

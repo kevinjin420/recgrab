@@ -5,6 +5,7 @@
 		hiddenRow: 'rg-hidden-row',
 		mutedCell: 'rg-muted-cell',
 		insufficientCell: 'rg-insufficient-cell',
+		flexibleCell: 'rg-flexible-cell',
 		targetCell: 'rg-target-cell',
 		targetRow: 'rg-target-row'
 	};
@@ -14,7 +15,7 @@
 		scan.rows.forEach((row) => {
 			row.rowEl.classList.remove(CLASS.hiddenRow, CLASS.targetRow);
 			row.dates.forEach((d) => d.cellEl.classList.remove(
-				CLASS.mutedCell, CLASS.insufficientCell, CLASS.targetCell
+				CLASS.mutedCell, CLASS.insufficientCell, CLASS.flexibleCell, CLASS.targetCell
 			));
 		});
 	}
@@ -27,9 +28,20 @@
 		return dateCell.remaining >= (config.groupSize || 1);
 	}
 
+	function hasEnoughSpots(dateCell, config) {
+		if (dateCell.state !== 'available') return false;
+		if (dateCell.remaining == null) return true;
+		return dateCell.remaining >= (config.groupSize || 1);
+	}
+
+	function isFlexibleMatch(dateCell, config) {
+		return !!(config.flexibleDates && config.targetDate &&
+			dateCell.iso !== config.targetDate &&
+			hasEnoughSpots(dateCell, config));
+	}
+
 	function isInsufficient(dateCell, config) {
 		return dateCell.state === 'available' &&
-			(!config.targetDate || dateCell.iso === config.targetDate) &&
 			dateCell.remaining != null &&
 			dateCell.remaining < (config.groupSize || 1);
 	}
@@ -59,10 +71,15 @@
 					d.cellEl.classList.add(CLASS.targetCell);
 					return;
 				}
+				if (inWatchlist && isFlexibleMatch(d, config)) {
+					d.cellEl.classList.add(CLASS.flexibleCell);
+					return;
+				}
 				if (inWatchlist && isInsufficient(d, config)) {
 					d.cellEl.classList.add(CLASS.insufficientCell);
 					return;
 				}
+				if (inWatchlist && d.state === 'available') return;
 				d.cellEl.classList.add(CLASS.mutedCell);
 			});
 
@@ -75,5 +92,5 @@
 		return { matched, totalRows: scan.rows.length };
 	}
 
-	window.RG.filter = { apply, clearDecorations, isMatch, isInsufficient, CLASS };
+	window.RG.filter = { apply, clearDecorations, isMatch, isFlexibleMatch, isInsufficient, CLASS };
 })();

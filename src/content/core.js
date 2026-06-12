@@ -15,6 +15,7 @@
 		watchlist: [], // entry-point IDs (preferred) or name substrings
 		groupSize: null, // desired "Group Members" count; null = leave alone
 		hideNonMatchingRows: true,
+		flexibleDates: false,
 		autoGrab: false,
 		targetDate: '', // ISO date auto-grab may click, e.g. "2026-06-13"
 		autoGrabIntervalMs: 4000,
@@ -56,6 +57,7 @@
 	}
 
 	function cellState(cellEl) {
+		if (cellEl.classList.contains('selected')) return 'available';
 		if (cellEl.classList.contains('available')) return 'available';
 		if (cellEl.classList.contains('not-yet-released')) return 'not-yet-released';
 		if (cellEl.classList.contains('unavailable')) return 'unavailable';

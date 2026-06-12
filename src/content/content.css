@@ -5,6 +5,10 @@
 	opacity: 0.32 !important;
 	filter: grayscale(0.45);
 }
+.rg-muted-cell.selected {
+	opacity: 1 !important;
+	filter: none !important;
+}
 
 .rg-insufficient-cell {
 	background: #fff7e8 !important;
@@ -14,15 +18,51 @@
 	color: #8b6220 !important;
 }
 
-.rg-target-cell {
-	background: #eff6e8 !important;
-	outline: 2px solid #466c04 !important;
-	outline-offset: -2px;
-	border-radius: 4px;
+.rg-flexible-cell {
+	background: #d5e9ff !important;
 }
-.rg-target-cell button {
+.rg-flexible-cell .rec-availability-date {
+	background: #b8d9ff !important;
+	border-color: transparent !important;
+	color: #2f4668 !important;
+	font-weight: 700 !important;
+}
+.rg-flexible-cell .rec-availability-date:hover {
+	background: #9fcaff !important;
+	color: #2f4668 !important;
+}
+.rg-flexible-cell .rec-availability-date .sarsa-icon {
+	color: #2f4668 !important;
+}
+
+.rg-target-cell {
+	background: #d9edc8 !important;
+}
+.rg-target-cell .rec-availability-date {
+	background: #b9dd9f !important;
+	border-color: transparent !important;
 	color: #1f3f02 !important;
 	font-weight: 700 !important;
+}
+.rg-target-cell .rec-availability-date:hover {
+	background: #a2cf82 !important;
+	color: #1f3f02 !important;
+}
+.rg-target-cell .rec-availability-date .sarsa-icon {
+	color: #1f3f02 !important;
+}
+
+.rec-grid-grid-cell.selected .rec-availability-date,
+.rec-grid-grid-cell.selected.rg-target-cell .rec-availability-date,
+.rec-grid-grid-cell.selected.rg-flexible-cell .rec-availability-date {
+	background: #466c04 !important;
+	border-color: transparent !important;
+	color: #fff !important;
+}
+.rec-grid-grid-cell.selected .rec-availability-date .sarsa-icon,
+.rec-grid-grid-cell.selected.rg-target-cell .rec-availability-date .sarsa-icon,
+.rec-grid-grid-cell.selected.rg-flexible-cell .rec-availability-date .sarsa-icon {
+	color: #fff !important;
 }
 
 .rg-target-row { background: #eff6e8 !important; }
