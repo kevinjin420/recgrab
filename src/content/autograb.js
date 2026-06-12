@@ -133,26 +133,43 @@
 		const btn = await waitForEnabledBookNow(timeout);
 		if (!btn) {
 			RG.log('"Book Now" never enabled within', timeout, 'ms — selection may not have registered');
-			return false;
+			return 'not-ready';
 		}
+		const startHref = location.href;
 		RG.log('clicking "Book Now"');
 		pressBtn(btn);
-		await RG.sleep(450);
-		// If the page navigated away or the button is gone/disabled, treat as success.
-		if (!document.contains(btn) || !isEnabled(findBookNow() || btn)) {
-			RG.log('"Book Now" click registered');
-			return true;
+		const t0 = Date.now();
+		while (Date.now() - t0 < 5000) {
+			// If the page navigated away or the button is gone/disabled, treat as confirmed.
+			if (location.href !== startHref || !document.contains(btn) || !isEnabled(findBookNow() || btn)) {
+				RG.log('"Book Now" click confirmed');
+				return 'confirmed';
+			}
+			await RG.sleep(150);
 		}
-		RG.log('"Book Now" press did not appear to take');
-		return false;
+		RG.log('"Book Now" click sent; confirmation not observed');
+		return 'sent';
 	}
 
-	// Press a date cell, then confirm selection by waiting for Book Now to enable.
-	async function selectDateCell(btnEl) {
-		if (!btnEl || !document.contains(btnEl)) return false;
-		RG.log('selecting date cell');
-		pressBtn(btnEl);
-		return !!(await waitForEnabledBookNow(2500));
+	function isCellSelected(btnEl) {
+		return !!btnEl?.closest('.rec-grid-grid-cell.selected');
+	}
+
+	// Date selection is UI state, so retrying it is safe. Book Now remains one-shot.
+	async function selectDateCell(btnEl, { tries = 3 } = {}) {
+		if (!btnEl) return false;
+		for (let attempt = 1; attempt <= tries; attempt++) {
+			if (!document.contains(btnEl)) return false;
+			RG.log(`selecting date cell (attempt ${attempt})`);
+			pressBtn(btnEl);
+			const t0 = Date.now();
+			while (Date.now() - t0 < 1600) {
+				if (isCellSelected(btnEl)) return true;
+				if (isEnabled(findBookNow())) return true;
+				await RG.sleep(120);
+			}
+		}
+		return false;
 	}
 
 	const targetDate = (config) => config.targetDate || '';
@@ -213,16 +230,19 @@
 		RG.log('auto-grab target', target.key, `${target.date.remaining} spots — booking`);
 
 		const selected = await selectDateCell(target.date.btnEl);
-		const booked = selected && await clickBookNow();
+		const bookingResult = selected ? await clickBookNow() : 'not-ready';
 		if (!selected) {
 			RG.log('date selection did not register');
 		}
 
 		// Stay armed: auto-grab keeps watching until the user turns it off.
 		booking = false;
-		notify(booked
-			? `RecGrab grabbed ${target.row.name} on ${target.date.iso} — Book Now clicked. Finish checkout to confirm. (Auto-grab still on.)`
-			: `RecGrab saw ${target.row.name} on ${target.date.iso} but couldn't lock it in.`);
+		const base = `RecGrab saw ${target.row.name} on ${target.date.iso}`;
+		notify(bookingResult === 'confirmed'
+			? `${base} — Book Now clicked and the page reacted. Finish checkout to confirm. (Auto-grab still on.)`
+			: bookingResult === 'sent'
+				? `${base} — Book Now click sent once; confirmation was not observed. Check the page before retrying.`
+				: `${base} but couldn't get Book Now ready.`);
 	}
 
 	function notify(msg) {
@@ -252,7 +272,7 @@
 
 	window.RG.autograb = {
 		start, stop, tick, findGrabTarget, findBookNow, findAllBookNow,
-		clickBookNow, selectDateCell, waitForEnabledBookNow, pressBtn,
+		clickBookNow, selectDateCell, isCellSelected, waitForEnabledBookNow, pressBtn,
 		visibleDates, currentGridDateRange, isDateVisible, currentPageDate,
 		navigateToDate, waitForDateVisible,
 		pageDateForTarget,

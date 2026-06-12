@@ -104,8 +104,8 @@
 	// Manually drive the Book Now click path and report the outcome.
 	async function diagBookNow() {
 		logLine('manual: clicking Book Now…');
-		const ok = await RG.autograb.clickBookNow({ timeout: 4000 });
-		logLine('manual: clickBookNow -> ' + (ok ? 'CLICKED' : 'failed (see above)'));
+		const result = await RG.autograb.clickBookNow({ timeout: 4000 });
+		logLine('manual: clickBookNow -> ' + result);
 	}
 
 	function globalToggle(label, key, state, danger) {
