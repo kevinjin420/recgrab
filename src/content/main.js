@@ -4,6 +4,7 @@
 (() => {
 	const RG = window.RG;
 	const ctx = RG.pageContext();
+	const ENABLE_FLOATING_PANEL = false;
 
 	let config = null;
 	let globals = { enabled: true, armed: false };
@@ -213,7 +214,7 @@
 			return;
 		}
 
-		await RG.panel.render(panelState());
+		if (ENABLE_FLOATING_PANEL) await RG.panel.render(panelState());
 		observeGrid();
 		window.addEventListener('scroll', () => syncNativeControlsLock(), { passive: true, capture: true });
 		window.addEventListener('resize', () => syncNativeControlsLock(), { passive: true });
@@ -241,7 +242,7 @@
 			globals = await RG.getGlobals();
 			RG.autograb.resetClickGuard();
 			rerun();
-			RG.panel.update(panelState());
+			if (ENABLE_FLOATING_PANEL) RG.panel.update(panelState());
 			if (globals.enabled) maybeAutoSetGroup();
 			syncNativeControlsLock();
 			refreshAutograb();
