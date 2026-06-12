@@ -9,6 +9,10 @@
 	let globals = { enabled: true, armed: false };
 	let grabbing = false;
 	let debounceTimer = null;
+	let nativeControlsRoot = null;
+	let nativeControlsShield = null;
+	let nativeControlsTooltip = null;
+	let nativeControlsTooltipTimer = null;
 
 	// Effective config passed downstream: per-page settings + the global on/off.
 	function eff() { return { ...config, enabled: globals.enabled }; }
@@ -39,8 +43,125 @@
 
 	function observeGrid() {
 		const target = document.getElementById('recApp') || document.body;
-		const obs = new MutationObserver(() => scheduleRerun());
+		const obs = new MutationObserver(() => {
+			scheduleRerun();
+			syncNativeControlsLock();
+		});
 		obs.observe(target, { childList: true, subtree: true });
+	}
+
+	function buttonText(btn) {
+		return (btn?.textContent || '').replace(/\s+/g, ' ').trim();
+	}
+
+	function nativeDateNavButtons() {
+		return [...document.querySelectorAll('button')].filter((btn) => {
+			const text = buttonText(btn);
+			return text.includes('Clear Dates') ||
+				text.includes('Prev 5 Days') ||
+				text.includes('Next 5 Days');
+		});
+	}
+
+	function findNativeControlsRoot() {
+		const dateInput = document.querySelector(RG.SEL.entryDateHidden);
+		const guest = document.querySelector(RG.SEL.guestTrigger);
+		const navButtons = nativeDateNavButtons();
+		const anchor = dateInput || guest || navButtons[0];
+		if (!anchor) return null;
+
+		for (let el = anchor.parentElement; el && el !== document.body; el = el.parentElement) {
+			const hasDateOrGuest = !!(el.querySelector(RG.SEL.entryDateHidden) ||
+				el.querySelector(RG.SEL.guestTrigger));
+			const hasDateNav = navButtons.some((btn) => el.contains(btn));
+			if (hasDateOrGuest && hasDateNav && !el.querySelector(RG.SEL.anyGrid)) return el;
+		}
+		return null;
+	}
+
+	function removeNativeControlsShield() {
+		nativeControlsRoot = null;
+		nativeControlsShield?.remove();
+		nativeControlsShield = null;
+		nativeControlsTooltip?.remove();
+		nativeControlsTooltip = null;
+		clearTimeout(nativeControlsTooltipTimer);
+	}
+
+	function ensureNativeControlsShield() {
+		if (nativeControlsShield) return nativeControlsShield;
+
+		nativeControlsShield = document.createElement('div');
+		nativeControlsShield.className = 'rg-native-controls-shield';
+		nativeControlsShield.setAttribute('role', 'button');
+		nativeControlsShield.setAttribute('aria-label', 'Use the RecGrab extension to change booking details');
+
+		for (const eventName of ['pointerdown', 'mousedown', 'touchstart']) {
+			nativeControlsShield.addEventListener(eventName, (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				const point = e.touches?.[0] || e;
+				showNativeControlsTooltip(point.clientX, point.clientY);
+			}, true);
+		}
+		nativeControlsShield.addEventListener('click', (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			showNativeControlsTooltip(e.clientX, e.clientY);
+		}, true);
+
+		document.body.appendChild(nativeControlsShield);
+		return nativeControlsShield;
+	}
+
+	function showNativeControlsTooltip(x, y) {
+		if (!nativeControlsTooltip) {
+			nativeControlsTooltip = document.createElement('div');
+			nativeControlsTooltip.className = 'rg-native-controls-tooltip';
+			nativeControlsTooltip.textContent = 'Use the RecGrab extension popup to change date and group size.';
+			document.body.appendChild(nativeControlsTooltip);
+		}
+
+		const left = Math.min(Math.max(x + 12, 12), window.innerWidth - 280);
+		const top = Math.min(Math.max(y + 12, 12), window.innerHeight - 72);
+		nativeControlsTooltip.style.left = `${left}px`;
+		nativeControlsTooltip.style.top = `${top}px`;
+		nativeControlsTooltip.classList.add('rg-show');
+
+		clearTimeout(nativeControlsTooltipTimer);
+		nativeControlsTooltipTimer = setTimeout(() => {
+			nativeControlsTooltip?.classList.remove('rg-show');
+		}, 2200);
+	}
+
+	function positionNativeControlsShield(root) {
+		const rect = root.getBoundingClientRect();
+		const shield = ensureNativeControlsShield();
+		shield.style.left = `${rect.left}px`;
+		shield.style.top = `${rect.top}px`;
+		shield.style.width = `${rect.width}px`;
+		shield.style.height = `${rect.height}px`;
+	}
+
+	function syncNativeControlsLock() {
+		document.querySelectorAll('.rg-native-controls-locked').forEach((el) => {
+			el.classList.remove('rg-native-controls-locked');
+			el.removeAttribute('aria-disabled');
+		});
+		if (!globals.enabled) {
+			removeNativeControlsShield();
+			return;
+		}
+
+		const root = findNativeControlsRoot();
+		if (!root) {
+			removeNativeControlsShield();
+			return;
+		}
+		root.classList.add('rg-native-controls-locked');
+		root.setAttribute('aria-disabled', 'true');
+		nativeControlsRoot = root;
+		positionNativeControlsShield(root);
 	}
 
 	// Popup <-> content messaging. Registered unconditionally so the popup can
@@ -94,9 +215,12 @@
 
 		await RG.panel.render(panelState());
 		observeGrid();
+		window.addEventListener('scroll', () => syncNativeControlsLock(), { passive: true, capture: true });
+		window.addEventListener('resize', () => syncNativeControlsLock(), { passive: true });
 		rerun();
 		maybeAutoSetGroup();
 		maybeCenterTargetDate();
+		syncNativeControlsLock();
 		refreshAutograb();
 
 		// Per-page config changed (popup edits): re-decorate + re-evaluate grab.
@@ -108,6 +232,7 @@
 			rerun();
 			if (next.groupSize !== prevSize) maybeAutoSetGroup();
 			if (next.targetDate && next.targetDate !== prevTarget) maybeCenterTargetDate();
+			syncNativeControlsLock();
 			refreshAutograb();
 		});
 
@@ -118,21 +243,10 @@
 			rerun();
 			RG.panel.update(panelState());
 			if (globals.enabled) maybeAutoSetGroup();
+			syncNativeControlsLock();
 			refreshAutograb();
 		});
 	}
-
-	// Re-apply on SPA navigations (recreation.gov is a single-page app). Self-
-	// destructs if this script gets orphaned by an extension reload.
-	let lastPath = location.pathname;
-	const navTimer = setInterval(() => {
-		if (!RG.extAlive()) { clearInterval(navTimer); RG.autograb.stop(); return; }
-		if (location.pathname !== lastPath) {
-			lastPath = location.pathname;
-			RG.log('SPA navigation ->', lastPath);
-			RG.getConfig().then((c) => { config = c; rerun(); });
-		}
-	}, 1000);
 
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', boot);

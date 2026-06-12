@@ -67,6 +67,41 @@
 
 .rg-target-row { background: #eff6e8 !important; }
 
+.rg-native-controls-locked {
+	opacity: 0.45 !important;
+	filter: grayscale(0.4);
+	pointer-events: none !important;
+	user-select: none !important;
+}
+.rg-native-controls-locked * {
+	cursor: not-allowed !important;
+}
+.rg-native-controls-shield {
+	position: fixed;
+	z-index: 2147483644;
+	background: rgba(255, 255, 255, 0.01);
+	cursor: not-allowed;
+}
+.rg-native-controls-tooltip {
+	position: fixed;
+	z-index: 2147483645;
+	max-width: 260px;
+	padding: 8px 10px;
+	background: #1a1e23;
+	color: #fff;
+	border-radius: 6px;
+	box-shadow: 0 6px 18px rgba(26, 30, 35, 0.24);
+	font: 12px/1.35 "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	pointer-events: none;
+	opacity: 0;
+	transform: translateY(-3px);
+	transition: opacity 120ms ease, transform 120ms ease;
+}
+.rg-native-controls-tooltip.rg-show {
+	opacity: 1;
+	transform: translateY(0);
+}
+
 /* Floating status panel */
 .rg-panel {
 	position: fixed;
