@@ -139,7 +139,7 @@ h1, h2 { margin: 0; }
 
 /* Entry-point list */
 .ep-list {
-	max-height: 132px;
+	max-height: 200px;
 	overflow-y: auto;
 	overflow-x: hidden;
 	border: 1px solid var(--border);

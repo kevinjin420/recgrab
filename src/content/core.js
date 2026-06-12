@@ -15,9 +15,6 @@
 		watchlist: [], // entry-point IDs (preferred) or name substrings
 		groupSize: null, // desired "Group Members" count; null = leave alone
 		hideNonMatchingRows: true,
-		hideRowsWithNoMatch: false,
-		dimUnavailable: true,
-		highlightMatches: true,
 		autoGrab: false,
 		targetDate: '', // ISO date auto-grab may click, e.g. "2026-06-13"
 		autoGrabIntervalMs: 4000,

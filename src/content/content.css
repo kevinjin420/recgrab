@@ -1,22 +1,31 @@
 /* Grid decorations (palette mirrors recreation.gov "sarsaparilla") */
 .rg-hidden-row { display: none !important; }
 
-.rg-dim-cell { opacity: 0.3 !important; filter: grayscale(0.5); }
+.rg-muted-cell {
+	opacity: 0.32 !important;
+	filter: grayscale(0.45);
+}
 
-.rg-match-cell {
+.rg-insufficient-cell {
+	background: #fff7e8 !important;
+	opacity: 0.75 !important;
+}
+.rg-insufficient-cell button {
+	color: #8b6220 !important;
+}
+
+.rg-target-cell {
+	background: #eff6e8 !important;
 	outline: 2px solid #466c04 !important;
 	outline-offset: -2px;
 	border-radius: 4px;
-	animation: rg-pulse 1.6s ease-in-out infinite;
 }
-.rg-match-cell button { font-weight: 700 !important; }
-
-.rg-match-row { background: #eff6e8 !important; }
-
-@keyframes rg-pulse {
-	0%, 100% { outline-color: #466c04; }
-	50% { outline-color: #8bbf3f; }
+.rg-target-cell button {
+	color: #1f3f02 !important;
+	font-weight: 700 !important;
 }
+
+.rg-target-row { background: #eff6e8 !important; }
 
 /* Floating status panel */
 .rg-panel {

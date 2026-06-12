@@ -3,16 +3,19 @@
 	const RG = window.RG;
 	const CLASS = {
 		hiddenRow: 'rg-hidden-row',
-		dimCell: 'rg-dim-cell',
-		matchCell: 'rg-match-cell',
-		matchRow: 'rg-match-row'
+		mutedCell: 'rg-muted-cell',
+		insufficientCell: 'rg-insufficient-cell',
+		targetCell: 'rg-target-cell',
+		targetRow: 'rg-target-row'
 	};
 
 	function clearDecorations(scan) {
 		if (!scan) return;
 		scan.rows.forEach((row) => {
-			row.rowEl.classList.remove(CLASS.hiddenRow, CLASS.matchRow);
-			row.dates.forEach((d) => d.cellEl.classList.remove(CLASS.dimCell, CLASS.matchCell));
+			row.rowEl.classList.remove(CLASS.hiddenRow, CLASS.targetRow);
+			row.dates.forEach((d) => d.cellEl.classList.remove(
+				CLASS.mutedCell, CLASS.insufficientCell, CLASS.targetCell
+			));
 		});
 	}
 
@@ -24,6 +27,13 @@
 		return dateCell.remaining >= (config.groupSize || 1);
 	}
 
+	function isInsufficient(dateCell, config) {
+		return dateCell.state === 'available' &&
+			(!config.targetDate || dateCell.iso === config.targetDate) &&
+			dateCell.remaining != null &&
+			dateCell.remaining < (config.groupSize || 1);
+	}
+
 	function apply(config) {
 		const scan = RG.scanGrid();
 		if (!scan) return { matched: 0, totalRows: 0 };
@@ -32,37 +42,38 @@
 		if (!config.enabled) return { matched: 0, totalRows: scan.rows.length };
 
 		let matched = 0;
+		const hasWatchlist = !!(config.watchlist && config.watchlist.length);
 		scan.rows.forEach((row) => {
-			const inWatchlist = RG.matchesWatchlist(row, config.watchlist);
+			const inWatchlist = hasWatchlist && RG.matchesWatchlist(row, config.watchlist);
 
-			if (!inWatchlist && config.hideNonMatchingRows) {
+			if (hasWatchlist && !inWatchlist && config.hideNonMatchingRows) {
 				row.rowEl.classList.add(CLASS.hiddenRow);
 				return;
 			}
 
 			let rowHasMatch = false;
 			row.dates.forEach((d) => {
-				if (config.dimUnavailable && d.state !== 'available') {
-					d.cellEl.classList.add(CLASS.dimCell);
-				}
-				if (isMatch(d, config)) {
+				const actionable = inWatchlist && isMatch(d, config);
+				if (actionable) {
 					rowHasMatch = true;
-					if (config.highlightMatches) d.cellEl.classList.add(CLASS.matchCell);
+					d.cellEl.classList.add(CLASS.targetCell);
+					return;
 				}
+				if (inWatchlist && isInsufficient(d, config)) {
+					d.cellEl.classList.add(CLASS.insufficientCell);
+					return;
+				}
+				d.cellEl.classList.add(CLASS.mutedCell);
 			});
 
-			if (rowHasMatch && inWatchlist) {
-				row.rowEl.classList.add(CLASS.matchRow);
+			if (rowHasMatch) {
+				row.rowEl.classList.add(CLASS.targetRow);
 				matched++;
-			}
-
-			if (inWatchlist && !rowHasMatch && config.hideRowsWithNoMatch) {
-				row.rowEl.classList.add(CLASS.hiddenRow);
 			}
 		});
 
 		return { matched, totalRows: scan.rows.length };
 	}
 
-	window.RG.filter = { apply, clearDecorations, isMatch, CLASS };
+	window.RG.filter = { apply, clearDecorations, isMatch, isInsufficient, CLASS };
 })();

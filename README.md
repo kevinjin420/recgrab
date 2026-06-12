@@ -135,11 +135,9 @@ to ISO dates by parsing the header row's screen-reader date labels
 | Armed (global) | Auto-grab is live on every saved page; grayed out while Off |
 | Entry points | Checkbox list scanned from the page (name, area, ID, open count). All / None / Open-only shortcuts + search. Selection is stored as entry-point IDs |
 | Group size | Number of people; stepper or type. Saved group sizes are always applied automatically when the page loads |
-| Highlight open matches | Pulsing outline on bookable cells meeting the spot threshold |
-| Hide unselected rows | Collapse rows not in your selection |
-| Hide selected rows with nothing open | Hide watched rows with no open date in view |
-| Dim unavailable / not-released | De-emphasize cells you can't book |
 | Target date | The single date RecGrab navigates to before scanning/clicking |
+| Hide unselected entry points | Collapse rows not in your selection |
+| Automatic highlighting | Watched, bookable target cells are green; non-actionable cells are muted; available cells with too few spots are subtly amber |
 | On (global) | Master on/off for the whole extension; toggling off disarms |
 | Armed (global) | Auto-grab is live on every saved page; clicks the date cell then **Book Now**, stays armed until turned off |
 
