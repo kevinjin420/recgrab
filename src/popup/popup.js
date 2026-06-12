@@ -15,6 +15,7 @@ const $ = (id) => document.getElementById(id);
 
 const state = { tabId: null, scan: null, key: null, cfg: { ...DEFAULTS } };
 let calendarMonth = firstOfMonth(new Date());
+let entryListMode = 'all';
 
 // ---- storage (per-context) ----
 async function getConfigs() {
@@ -146,13 +147,19 @@ function render() {
 function renderEntryPoints(filterText = '') {
 	const list = $('epList');
 	list.innerHTML = '';
+	$('showSelected')?.classList.toggle('active', entryListMode === 'selected');
 	const q = filterText.trim().toLowerCase();
-	const items = state.scan.entryPoints.filter((ep) =>
-		!q || ep.name.toLowerCase().includes(q) || ep.id.includes(q) || ep.area.toLowerCase().includes(q));
+	const selected = new Set(state.cfg.watchlist);
+	const items = state.scan.entryPoints.filter((ep) => {
+		if (entryListMode === 'selected' && !selected.has(ep.id)) return false;
+		return !q || ep.name.toLowerCase().includes(q) || ep.id.includes(q) || ep.area.toLowerCase().includes(q);
+	});
 
 	if (!items.length) {
 		const msg = state.scan.entryPoints.length === 0
 			? 'Set a group size above to load entry points.'
+			: entryListMode === 'selected'
+				? 'No selected entry points match your search.'
 			: 'No entry points match your search.';
 		list.innerHTML = `<div class="ep-empty">${msg}</div>`;
 		return;
@@ -177,6 +184,7 @@ function renderEntryPoints(filterText = '') {
 		row.querySelector('input').addEventListener('change', (e) => {
 			row.classList.toggle('checked', e.target.checked);
 			toggleWatch(ep.id, e.target.checked);
+			if (entryListMode === 'selected' && !e.target.checked) renderEntryPoints($('epSearch').value);
 		});
 		list.appendChild(row);
 	});
@@ -301,6 +309,10 @@ function wire() {
 	$('selAll').addEventListener('click', () => bulkSelect('all'));
 	$('selNone').addEventListener('click', () => bulkSelect('none'));
 	$('selOpen').addEventListener('click', () => bulkSelect('open'));
+	$('showSelected').addEventListener('click', () => {
+		entryListMode = entryListMode === 'selected' ? 'all' : 'selected';
+		renderEntryPoints($('epSearch').value);
+	});
 	$('dateTrigger').addEventListener('click', toggleCalendar);
 	$('calPrev').addEventListener('click', () => moveCalendarMonth(-1));
 	$('calNext').addEventListener('click', () => moveCalendarMonth(1));

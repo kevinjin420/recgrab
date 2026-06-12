@@ -124,6 +124,7 @@ h1, h2 { margin: 0; }
 .mini-actions { display: flex; gap: 10px; }
 .link { background: none; border: 0; color: var(--link); cursor: pointer; font: inherit; font-size: 12px; padding: 0; }
 .link:hover { text-decoration: underline; }
+.link.active { color: var(--green-dk); font-weight: 700; text-decoration: underline; }
 .danger-link { color: var(--red); }
 
 /* Search + numbers */
@@ -145,7 +146,7 @@ h1, h2 { margin: 0; }
 
 /* Entry-point list */
 .ep-list {
-	max-height: 250px;
+	height: 250px;
 	overflow-y: auto;
 	overflow-x: hidden;
 	border: 1px solid var(--border);
