@@ -28,6 +28,7 @@ body {
 	line-height: 1.45;
 	color: var(--ink);
 	background: var(--bg);
+	overflow-x: hidden;
 }
 h1, h2 { margin: 0; }
 
@@ -266,8 +267,8 @@ h1, h2 { margin: 0; }
 .calendar-panel {
 	position: absolute;
 	z-index: 5;
-	left: 0;
-	top: calc(100% + 6px);
+	right: 0;
+	bottom: calc(100% + 6px);
 	width: 260px;
 	padding: 10px;
 	background: #fff;
