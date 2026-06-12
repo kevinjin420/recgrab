@@ -321,7 +321,6 @@ function wire() {
 	$('bPlus').addEventListener('click', () => bumpBanner(1));
 	$('bMinus').addEventListener('click', () => bumpBanner(-1));
 	$('loadBtn').addEventListener('click', loadAvailability);
-	$('dumpLink').addEventListener('click', copyDiagnostics);
 	$('retryBtn').addEventListener('click', init);
 	$('saveBtn').addEventListener('click', async () => { await persistNow(); window.close(); });
 	$('clearBtn').addEventListener('click', clearAllSettings);
@@ -355,23 +354,6 @@ async function setTargetDate(iso) {
 	renderCalendar();
 	try { await send('rg:navigateDate', { iso }); } catch {}
 	return true;
-}
-
-// Opens the live guest popup, grabs its markup, and copies it to the clipboard
-// so the exact (portal-rendered) structure can be shared for targeting.
-async function copyDiagnostics() {
-	const link = $('dumpLink');
-	const orig = link.textContent;
-	link.textContent = 'Reading popup…';
-	try {
-		const res = await send('rg:dumpPopup');
-		const html = res?.html || '(no markup returned)';
-		await navigator.clipboard.writeText(html);
-		link.textContent = 'Copied — paste it to the developer';
-	} catch {
-		link.textContent = 'Couldn\'t read popup';
-	}
-	setTimeout(() => (link.textContent = orig), 2600);
 }
 
 function bumpBanner(delta) {

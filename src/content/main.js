@@ -177,9 +177,6 @@
 			case 'rg:applyGroupSize':
 				RG.autofill.setGroupSize(msg.size).then((r) => sendResponse(r));
 				return true; // async
-			case 'rg:dumpPopup':
-				RG.autofill.dumpPopup().then((html) => sendResponse({ html }));
-				return true; // async
 			case 'rg:navigateDate':
 				sendResponse({ ok: true, navigated: RG.autograb.navigateToDate(msg.iso) });
 				return;

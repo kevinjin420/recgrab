@@ -3,7 +3,7 @@
 	"name": "RecGrab",
 	"version": "0.1.0",
 	"description": "Filter Recreation.gov detailed-availability grids to the entry points you want, auto-set group size, and assist clicking open dates.",
-	"permissions": ["storage", "activeTab", "scripting", "clipboardWrite"],
+	"permissions": ["storage"],
 	"host_permissions": ["https://www.recreation.gov/*"],
 	"action": {
 		"default_title": "RecGrab",
