@@ -77,6 +77,12 @@
 		}
 	}
 
+	function maybeCenterTargetDate() {
+		if (globals.enabled && config.targetDate) {
+			RG.autograb.navigateToDate(config.targetDate);
+		}
+	}
+
 	async function boot() {
 		config = await RG.getConfig();
 		globals = await RG.getGlobals();
@@ -90,15 +96,18 @@
 		observeGrid();
 		rerun();
 		maybeAutoSetGroup();
+		maybeCenterTargetDate();
 		refreshAutograb();
 
 		// Per-page config changed (popup edits): re-decorate + re-evaluate grab.
 		RG.onConfigChange((next) => {
 			const prevSize = config.groupSize;
+			const prevTarget = config.targetDate;
 			config = next;
 			RG.autograb.resetClickGuard();
 			rerun();
 			if (next.groupSize !== prevSize) maybeAutoSetGroup();
+			if (next.targetDate && next.targetDate !== prevTarget) maybeCenterTargetDate();
 			refreshAutograb();
 		});
 

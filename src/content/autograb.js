@@ -88,7 +88,6 @@
 	}
 
 	function navigateToDate(iso) {
-		if (isDateVisible(iso)) return false;
 		const pageIso = pageDateForTarget(iso);
 		if (currentPageDate() === pageIso) {
 			RG.log('date navigation pending; already on page date', pageIso, 'for target', iso);
