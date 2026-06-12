@@ -106,6 +106,12 @@ h1, h2 { margin: 0; }
 .switch input { width: 16px; height: 16px; accent-color: var(--green); flex: none; }
 .switch.danger span { color: var(--red); font-weight: 600; }
 .switch.danger input { accent-color: var(--red); }
+.option-row {
+	display: flex;
+	align-items: center;
+	gap: 18px;
+}
+.option-row .switch.sm { margin-top: 0; }
 
 .field-inline { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
 .field-inline span { color: var(--gray); }
